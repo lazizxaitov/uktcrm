@@ -52,6 +52,17 @@ export default function AIAssistantModal(props: { open: boolean; onClose: () => 
   const listRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    if (props.open) return;
+    setLoading(false);
+    setMessages([
+      {
+        role: "assistant",
+        text: "Выберите готовый вопрос — я покажу аналитику по вашей базе.",
+      },
+    ]);
+  }, [props.open]);
+
+  useEffect(() => {
     if (!props.open) return;
     setTimeout(() => listRef.current?.scrollTo({ top: 1e9, behavior: "smooth" }), 0);
   }, [props.open, messages.length]);
@@ -77,42 +88,41 @@ export default function AIAssistantModal(props: { open: boolean; onClose: () => 
 
   return (
     <Modal open={props.open} title="AI ассистент" onClose={props.onClose}>
-      <div className="grid gap-4 md:grid-cols-[260px_1fr]">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="px-1 py-2 text-sm font-semibold">Готовые вопросы</div>
-          <div className="space-y-2">
+      <div className="flex min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+        <div ref={listRef} className="h-[56vh] overflow-auto p-4">
+          <div className="space-y-3">
+            {messages.map((m, idx) => (
+              <div key={idx} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
+                <div
+                  className={[
+                    "max-w-[90%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm",
+                    m.role === "user"
+                      ? "bg-[var(--brand)] text-white"
+                      : "border border-zinc-200 bg-white text-zinc-800 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100",
+                  ].join(" ")}
+                >
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            {loading ? <div className="text-xs text-zinc-500">Думаю…</div> : null}
+          </div>
+        </div>
+
+        <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
+          <div className="text-xs font-medium text-zinc-500">Готовые вопросы</div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {presets.map((p) => (
               <button
                 key={p.type}
                 type="button"
                 onClick={() => runPreset(p.type, p.label)}
-                className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-left text-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900/30"
+                disabled={loading}
+                className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-left text-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900/30"
               >
                 {p.label}
               </button>
             ))}
-          </div>
-        </div>
-
-        <div className="flex min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-          <div ref={listRef} className="h-[52vh] overflow-auto p-4">
-            <div className="space-y-3">
-              {messages.map((m, idx) => (
-                <div key={idx} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                  <div
-                    className={[
-                      "max-w-[90%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm",
-                      m.role === "user"
-                        ? "bg-[var(--brand)] text-white"
-                        : "border border-zinc-200 bg-white text-zinc-800 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100",
-                    ].join(" ")}
-                  >
-                    {m.text}
-                  </div>
-                </div>
-              ))}
-              {loading ? <div className="text-xs text-zinc-500">Думаю…</div> : null}
-            </div>
           </div>
         </div>
       </div>
