@@ -20,7 +20,12 @@ type BatchRow = {
 function Modal(props: { open: boolean; title: string; onClose: () => void; children: React.ReactNode }) {
   if (!props.open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) props.onClose();
+      }}
+    >
       <div className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
         <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
           <div className="text-sm font-semibold">{props.title}</div>
@@ -57,10 +62,13 @@ export default function StockBatches(props: { products: ProductOption[]; batches
   const [openReceipt, setOpenReceipt] = useState(false);
   const [openSelectProducts, setOpenSelectProducts] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [dirtyReceipt, setDirtyReceipt] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const products = useMemo(() => props.products, [props.products]);
   const batches = useMemo(() => props.batches, [props.batches]);
+
+  const confirmClose = () => window.confirm("Есть несохранённые данные. Закрыть без сохранения?");
 
   return (
     <div className="space-y-4">
@@ -72,6 +80,7 @@ export default function StockBatches(props: { products: ProductOption[]; batches
             onClick={() => {
               setError(null);
               setSelectedProductIds([]);
+              setDirtyReceipt(false);
               setOpenReceipt(true);
             }}
             className="rounded-xl px-3 py-2 text-sm btn-primary"
@@ -116,7 +125,14 @@ export default function StockBatches(props: { products: ProductOption[]; batches
         </div>
       </div>
 
-      <Modal open={openReceipt} title="Приход партии" onClose={() => setOpenReceipt(false)}>
+      <Modal
+        open={openReceipt}
+        title="Приход партии"
+        onClose={() => {
+          if (dirtyReceipt && !confirmClose()) return;
+          setOpenReceipt(false);
+        }}
+      >
         <form
           action={async (formData) => {
             setError(null);
@@ -146,6 +162,7 @@ export default function StockBatches(props: { products: ProductOption[]; batches
             setOpenReceipt(false);
             window.location.reload();
           }}
+          onChange={() => setDirtyReceipt(true)}
           className="space-y-3"
         >
           <div>
@@ -208,6 +225,7 @@ export default function StockBatches(props: { products: ProductOption[]; batches
         onClose={() => setOpenSelectProducts(false)}
         onDone={(ids) => {
           setSelectedProductIds(ids);
+          setDirtyReceipt(true);
           setOpenSelectProducts(false);
         }}
       />

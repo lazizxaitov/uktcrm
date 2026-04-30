@@ -32,7 +32,12 @@ function Field(props: { label: string; name: string; defaultValue?: string; type
 function Modal(props: { open: boolean; title: string; onClose: () => void; children: React.ReactNode }) {
   if (!props.open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) props.onClose();
+      }}
+    >
       <div className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
         <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
           <div className="text-sm font-semibold">{props.title}</div>
@@ -58,8 +63,11 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
   const [extraCategories, setExtraCategories] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<ProductRow | null>(null);
+  const [dirtyProduct, setDirtyProduct] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const rows = useMemo(() => props.rows, [props.rows]);
+
+  const confirmClose = () => window.confirm("Есть несохранённые данные. Закрыть без сохранения?");
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -82,12 +90,14 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
   const startCreate = () => {
     setError(null);
     setEditing(null);
+    setDirtyProduct(false);
     setOpen(true);
   };
 
   const startEdit = (row: ProductRow) => {
     setError(null);
     setEditing(row);
+    setDirtyProduct(false);
     setOpen(true);
   };
 
@@ -179,7 +189,14 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
         </table>
       </div>
 
-      <Modal open={open} title={editing ? "Редактировать товар" : "Новый товар"} onClose={() => setOpen(false)}>
+      <Modal
+        open={open}
+        title={editing ? "Редактировать товар" : "Новый товар"}
+        onClose={() => {
+          if (dirtyProduct && !confirmClose()) return;
+          setOpen(false);
+        }}
+      >
         <form
           action={async (formData) => {
             setError(null);
@@ -191,6 +208,7 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
             setOpen(false);
             window.location.reload();
           }}
+          onChange={() => setDirtyProduct(true)}
           className="space-y-3"
         >
           {editing ? <input type="hidden" name="id" value={editing.id} /> : null}
@@ -247,7 +265,14 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
         </div>
       </Modal>
 
-      <Modal open={openCategories} title="Категории" onClose={() => setOpenCategories(false)}>
+      <Modal
+        open={openCategories}
+        title="Категории"
+        onClose={() => {
+          if (newCategory.trim() && !confirmClose()) return;
+          setOpenCategories(false);
+        }}
+      >
         <div className="space-y-4">
           <div className="grid gap-2 md:grid-cols-[1fr_auto]">
             <div>

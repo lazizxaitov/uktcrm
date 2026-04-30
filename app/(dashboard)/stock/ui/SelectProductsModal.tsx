@@ -7,7 +7,12 @@ type ProductOption = { id: string; name: string; sku: string };
 function Modal(props: { open: boolean; title: string; onClose: () => void; children: React.ReactNode }) {
   if (!props.open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) props.onClose();
+      }}
+    >
       <div className="w-full max-w-5xl overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
         <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
           <div className="text-sm font-semibold">{props.title}</div>
@@ -59,8 +64,16 @@ export default function SelectProductsModal(props: {
     setSelected((prev) => prev.filter((x) => x !== id));
   }
 
+  const confirmClose = () => window.confirm("Есть несохранённые данные. Закрыть без сохранения?");
+  const isDirty =
+    selected.length !== props.selectedIds.length || selected.some((id, i) => id !== props.selectedIds[i]);
+  const requestClose = () => {
+    if (isDirty && !confirmClose()) return;
+    props.onClose();
+  };
+
   return (
-    <Modal open={props.open} title="Выбор товаров" onClose={props.onClose}>
+    <Modal open={props.open} title="Выбор товаров" onClose={requestClose}>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
           <div className="flex items-center justify-between gap-3">
@@ -159,7 +172,7 @@ export default function SelectProductsModal(props: {
           <div className="mt-4 flex gap-2">
             <button
               type="button"
-              onClick={props.onClose}
+              onClick={requestClose}
               className="flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
             >
               Отмена

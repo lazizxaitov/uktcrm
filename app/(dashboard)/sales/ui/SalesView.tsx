@@ -14,7 +14,12 @@ type SaleRow = { id: string; status: string; currency: string; total: string; pa
 function Modal(props: { open: boolean; title: string; onClose: () => void; children: React.ReactNode }) {
   if (!props.open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) props.onClose();
+      }}
+    >
       <div className="w-full max-w-lg rounded-2xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
         <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
           <div className="text-sm font-semibold">{props.title}</div>
@@ -60,10 +65,15 @@ export default function SalesView(props: {
   const [openAdd, setOpenAdd] = useState(false);
   const [openClose, setOpenClose] = useState(false);
   const [refundId, setRefundId] = useState<string | null>(null);
+  const [dirtyOpen, setDirtyOpen] = useState(false);
+  const [dirtyAdd, setDirtyAdd] = useState(false);
+  const [dirtyClose, setDirtyClose] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const openSale = props.openSale;
   const openItems = props.openItems;
+
+  const confirmClose = () => window.confirm("Есть несохранённые данные. Закрыть без сохранения?");
 
   return (
     <div className="space-y-4">
@@ -71,18 +81,33 @@ export default function SalesView(props: {
         <div className="flex items-center justify-between px-4 py-3">
           <div className="text-sm font-semibold">Текущий чек</div>
           {!openSale ? (
-            <button type="button" onClick={() => setOpenOpen(true)} className="rounded-xl px-3 py-2 text-sm btn-primary">
+            <button
+              type="button"
+              onClick={() => {
+                setDirtyOpen(false);
+                setOpenOpen(true);
+              }}
+              className="rounded-xl px-3 py-2 text-sm btn-primary"
+            >
               Открыть чек
             </button>
           ) : (
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setOpenAdd(true)} className="rounded-xl px-3 py-2 text-sm btn-primary">
+              <button
+                type="button"
+                onClick={() => {
+                  setDirtyAdd(false);
+                  setOpenAdd(true);
+                }}
+                className="rounded-xl px-3 py-2 text-sm btn-primary"
+              >
                 Добавить позицию
               </button>
               <button
                 type="button"
                 onClick={() => {
                   setError(null);
+                  setDirtyClose(false);
                   setOpenClose(true);
                 }}
                 className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
@@ -230,7 +255,14 @@ export default function SalesView(props: {
         </div>
       </div>
 
-      <Modal open={openOpen} title="Открыть чек" onClose={() => setOpenOpen(false)}>
+      <Modal
+        open={openOpen}
+        title="Открыть чек"
+        onClose={() => {
+          if (dirtyOpen && !confirmClose()) return;
+          setOpenOpen(false);
+        }}
+      >
         <form
           action={async (fd) => {
             const res = await openSaleAction(fd);
@@ -238,6 +270,7 @@ export default function SalesView(props: {
             setOpenOpen(false);
             window.location.reload();
           }}
+          onChange={() => setDirtyOpen(true)}
           className="space-y-3"
         >
           <div>
@@ -272,7 +305,14 @@ export default function SalesView(props: {
         </form>
       </Modal>
 
-      <Modal open={openAdd} title="Добавить позицию" onClose={() => setOpenAdd(false)}>
+      <Modal
+        open={openAdd}
+        title="Добавить позицию"
+        onClose={() => {
+          if (dirtyAdd && !confirmClose()) return;
+          setOpenAdd(false);
+        }}
+      >
         <form
           action={async (fd) => {
             if (!openSale) return;
@@ -282,6 +322,7 @@ export default function SalesView(props: {
             setOpenAdd(false);
             window.location.reload();
           }}
+          onChange={() => setDirtyAdd(true)}
           className="space-y-3"
         >
           <div>
@@ -308,7 +349,14 @@ export default function SalesView(props: {
         </form>
       </Modal>
 
-      <Modal open={openClose} title="Закрыть чек" onClose={() => setOpenClose(false)}>
+      <Modal
+        open={openClose}
+        title="Закрыть чек"
+        onClose={() => {
+          if (dirtyClose && !confirmClose()) return;
+          setOpenClose(false);
+        }}
+      >
         <form
           action={async (fd) => {
             if (!openSale) return;
@@ -323,6 +371,7 @@ export default function SalesView(props: {
             setOpenClose(false);
             window.location.reload();
           }}
+          onChange={() => setDirtyClose(true)}
           className="space-y-3"
         >
           <div className="grid gap-3 md:grid-cols-2">
@@ -357,4 +406,3 @@ export default function SalesView(props: {
     </div>
   );
 }
-
