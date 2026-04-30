@@ -31,6 +31,10 @@ function pickType(body: ReqBody): string {
   if ((text.includes("30") || text.includes("месяц")) && (text.includes("продаж") || text.includes("выруч"))) return "sales_30d";
   if (text.includes("приб")) return "profit_30d";
   if (text.includes("склад") || text.includes("заканч")) return "low_stock";
+  if (text.includes("быстр") && (text.includes("заканч") || text.includes("тогай") || text.includes("tug"))) return "runout_soon";
+  if (text.includes("медлен") || text.includes("сек") || text.includes("sekin")) return "slow_sellers_30d";
+  if (text.includes("клиент") && (text.includes("прос") || text.includes("упал") || text.includes("pas"))) return "customers_down_30d";
+  if (text.includes("прогноз") || text.includes("forecast") || text.includes("prognoz")) return "sales_forecast";
   if (text.includes("стат")) return "system_stats";
   return "help";
 }
@@ -110,6 +114,226 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, title: "Товары на исходе", text });
     }
 
+    if (type === "runout_soon") {
+      const rows = database
+        .prepare(
+          `
+          WITH sales30 AS (
+            SELECT si.product_id as product_id,
+                   SUM(CAST(si.qty as REAL)) as sold30
+            FROM sale_items si
+            JOIN sales s ON s.id = si.sale_id
+            WHERE s.status='CLOSED' AND datetime(s.closed_at) >= datetime('now','-30 days')
+            GROUP BY si.product_id
+          ),
+          onhand AS (
+            SELECT b.product_id as product_id,
+                   COALESCE(SUM(CAST(b.qty_remaining as REAL)),0) as onhand
+            FROM stock_batches b
+            GROUP BY b.product_id
+          )
+          SELECT p.name, p.sku,
+                 COALESCE(o.onhand,0) as onhand,
+                 COALESCE(s30.sold30,0) as sold30
+          FROM products p
+          LEFT JOIN onhand o ON o.product_id = p.id
+          LEFT JOIN sales30 s30 ON s30.product_id = p.id
+          WHERE COALESCE(o.onhand,0) > 0 AND COALESCE(s30.sold30,0) > 0
+          ORDER BY (COALESCE(o.onhand,0) / (COALESCE(s30.sold30,0) / 30.0)) ASC
+          LIMIT 12
+        `,
+        )
+        .all() as Array<{ name: string; sku: string; onhand: number; sold30: number }>;
+
+      const enriched = rows
+        .map((r) => {
+          const ratePerDay = n2(r.sold30) / 30;
+          const days = ratePerDay > 0 ? n2(r.onhand) / ratePerDay : Infinity;
+          return { ...r, days };
+        })
+        .filter((r) => Number.isFinite(r.days))
+        .sort((a, b) => a.days - b.days)
+        .slice(0, 12);
+
+      if (enriched.length === 0) {
+        return Response.json({
+          ok: true,
+          title: "Какие товары скоро закончатся",
+          text: "Недостаточно данных: нужен остаток на складе и продажи за 30 дней.",
+        });
+      }
+
+      const text =
+        enriched
+          .map((r, i) => `${i + 1}. ${r.name} (${r.sku}) — остаток ${fmtNum(r.onhand)} • хватит примерно на ${fmtNum(r.days)} дн.`)
+          .join("\n") + "\n\nРасчёт: остаток / средние продажи в день (за 30 дней).";
+      return Response.json({ ok: true, title: "Какие товары скоро закончатся", text });
+    }
+
+    if (type === "slow_sellers_30d") {
+      const rows = database
+        .prepare(
+          `
+          WITH sales30 AS (
+            SELECT si.product_id as product_id,
+                   SUM(CAST(si.qty as REAL)) as sold30
+            FROM sale_items si
+            JOIN sales s ON s.id = si.sale_id
+            WHERE s.status='CLOSED' AND datetime(s.closed_at) >= datetime('now','-30 days')
+            GROUP BY si.product_id
+          ),
+          onhand AS (
+            SELECT b.product_id as product_id,
+                   COALESCE(SUM(CAST(b.qty_remaining as REAL)),0) as onhand
+            FROM stock_batches b
+            GROUP BY b.product_id
+          )
+          SELECT p.name, p.sku,
+                 COALESCE(o.onhand,0) as onhand,
+                 COALESCE(s30.sold30,0) as sold30
+          FROM products p
+          LEFT JOIN onhand o ON o.product_id = p.id
+          LEFT JOIN sales30 s30 ON s30.product_id = p.id
+          WHERE COALESCE(o.onhand,0) > 0
+          ORDER BY COALESCE(s30.sold30,0) ASC, COALESCE(o.onhand,0) DESC
+          LIMIT 15
+        `,
+        )
+        .all() as Array<{ name: string; sku: string; onhand: number; sold30: number }>;
+
+      if (rows.length === 0) {
+        return Response.json({ ok: true, title: "Какие товары медленно продаются", text: "Нет данных по складу." });
+      }
+
+      const text =
+        rows
+          .map((r, i) => {
+            const ratePerDay = n2(r.sold30) / 30;
+            const daysSupply = ratePerDay > 0 ? n2(r.onhand) / ratePerDay : Infinity;
+            const extra = Number.isFinite(daysSupply) ? ` • запас ~${fmtNum(daysSupply)} дн.` : " • продаж нет (30 дней)";
+            return `${i + 1}. ${r.name} (${r.sku}) — остаток ${fmtNum(r.onhand)} • продажи 30д: ${fmtNum(r.sold30)}${extra}`;
+          })
+          .join("\n") + "\n\nРекомендация: промо/скидка или уменьшить закуп.";
+      return Response.json({ ok: true, title: "Какие товары медленно продаются", text });
+    }
+
+    if (type === "customers_down_30d") {
+      const rows = database
+        .prepare(
+          `
+          WITH s_norm AS (
+            SELECT
+              s.customer_id as customer_id,
+              datetime(s.closed_at) as closed_at,
+              CAST(s.total as REAL) * (CASE WHEN s.currency='USD' THEN COALESCE(CAST(s.fx_rate_used as REAL), ?) ELSE 1 END) as total_uzs
+            FROM sales s
+            WHERE s.status='CLOSED' AND s.customer_id IS NOT NULL AND s.closed_at IS NOT NULL
+          ),
+          cur AS (
+            SELECT customer_id, SUM(total_uzs) as cur_uzs
+            FROM s_norm
+            WHERE datetime(closed_at) >= datetime('now','-30 days')
+            GROUP BY customer_id
+          ),
+          prev AS (
+            SELECT customer_id, SUM(total_uzs) as prev_uzs
+            FROM s_norm
+            WHERE datetime(closed_at) < datetime('now','-30 days') AND datetime(closed_at) >= datetime('now','-60 days')
+            GROUP BY customer_id
+          )
+          SELECT c.name as name,
+                 cur.cur_uzs as cur_uzs,
+                 prev.prev_uzs as prev_uzs
+          FROM cur
+          JOIN prev ON prev.customer_id = cur.customer_id
+          JOIN customers c ON c.id = cur.customer_id
+          WHERE (cur.cur_uzs - prev.prev_uzs) < 0
+          ORDER BY (cur.cur_uzs - prev.prev_uzs) ASC
+          LIMIT 10
+        `,
+        )
+        .all(fx) as Array<{ name: string; cur_uzs: number; prev_uzs: number }>;
+
+      if (rows.length === 0) {
+        return Response.json({
+          ok: true,
+          title: "Какие клиенты просели",
+          text: "Нет клиентов со снижением выручки (30 дней) относительно предыдущих 30 дней.",
+        });
+      }
+
+      const text =
+        rows
+          .map((r, i) => {
+            const cur = n2(r.cur_uzs);
+            const prev = n2(r.prev_uzs);
+            const delta = cur - prev;
+            const pct = prev > 0 ? (delta / prev) * 100 : 0;
+            return `${i + 1}. ${r.name} — было ${fmtMoneyUzs(prev)}, стало ${fmtMoneyUzs(cur)} (${fmtNum(pct)}%)`;
+          })
+          .join("\n") + "\n\nПериоды: последние 30 дней vs предыдущие 30 дней.";
+      return Response.json({ ok: true, title: "Какие клиенты просели", text });
+    }
+
+    if (type === "sales_forecast") {
+      const row30 = database
+        .prepare(
+          `
+          SELECT
+            COUNT(1) as checks,
+            SUM(CAST(total as REAL) * (CASE WHEN currency='USD' THEN COALESCE(CAST(fx_rate_used as REAL), ?) ELSE 1 END)) as revenue_uzs
+          FROM sales
+          WHERE status='CLOSED' AND datetime(closed_at) >= datetime('now','-30 days')
+        `,
+        )
+        .get(fx) as { checks: number; revenue_uzs: number | null };
+      const row7 = database
+        .prepare(
+          `
+          SELECT
+            COUNT(1) as checks,
+            SUM(CAST(total as REAL) * (CASE WHEN currency='USD' THEN COALESCE(CAST(fx_rate_used as REAL), ?) ELSE 1 END)) as revenue_uzs
+          FROM sales
+          WHERE status='CLOSED' AND datetime(closed_at) >= datetime('now','-7 days')
+        `,
+        )
+        .get(fx) as { checks: number; revenue_uzs: number | null };
+      const rowPrev7 = database
+        .prepare(
+          `
+          SELECT
+            COUNT(1) as checks,
+            SUM(CAST(total as REAL) * (CASE WHEN currency='USD' THEN COALESCE(CAST(fx_rate_used as REAL), ?) ELSE 1 END)) as revenue_uzs
+          FROM sales
+          WHERE status='CLOSED' AND datetime(closed_at) < datetime('now','-7 days') AND datetime(closed_at) >= datetime('now','-14 days')
+        `,
+        )
+        .get(fx) as { checks: number; revenue_uzs: number | null };
+
+      const rev30 = n2(row30.revenue_uzs);
+      const rev7 = n2(row7.revenue_uzs);
+      const revPrev7 = n2(rowPrev7.revenue_uzs);
+      const avgDay30 = rev30 / 30;
+      const forecast7 = avgDay30 * 7;
+      const trendPct = revPrev7 > 0 ? ((rev7 - revPrev7) / revPrev7) * 100 : 0;
+      const avgChecks30 = n2(row30.checks) / 30;
+      const forecastChecks7 = Math.round(avgChecks30 * 7);
+
+      if (rev30 <= 0) {
+        return Response.json({ ok: true, title: "Прогноз продаж", text: "Нет продаж за последние 30 дней — прогноз построить нельзя." });
+      }
+
+      return Response.json({
+        ok: true,
+        title: "Прогноз продаж",
+        text:
+          `Средняя выручка в день (30 дней): ${fmtMoneyUzs(avgDay30)}\n` +
+          `Прогноз на 7 дней: ${fmtMoneyUzs(forecast7)}\n` +
+          `Прогноз по чекам на 7 дней: ~${forecastChecks7}\n` +
+          `Тренд (последние 7 дней vs предыдущие 7): ${fmtNum(trendPct)}%`,
+      });
+    }
+
     if (type === "top_products_30d") {
       const rows = database
         .prepare(
@@ -143,7 +367,7 @@ export async function POST(request: Request) {
         ? { title: "Продажи сегодня", fromSql: "datetime(date('now'))" }
         : type === "sales_7d"
           ? { title: "Продажи за 7 дней", fromSql: "datetime('now','-7 days')" }
-          : type === "sales_30d" || type === "profit_30d"
+        : type === "sales_30d" || type === "profit_30d"
             ? { title: type === "profit_30d" ? "Прибыль за 30 дней" : "Продажи за 30 дней", fromSql: "datetime('now','-30 days')" }
             : null;
 
@@ -207,4 +431,3 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "FAIL" }, { status: 500 });
   }
 }
-

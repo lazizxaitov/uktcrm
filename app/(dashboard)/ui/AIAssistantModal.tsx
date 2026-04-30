@@ -68,12 +68,16 @@ export default function AIAssistantModal(props: { open: boolean; onClose: () => 
   }, [props.open, messages.length]);
 
   const presets: Array<{ label: string; type: string }> = [
+    { label: "Какие товары скоро закончатся", type: "runout_soon" },
+    { label: "Какие товары медленно продаются", type: "slow_sellers_30d" },
+    { label: "Какие клиенты просели", type: "customers_down_30d" },
+    { label: "Прогноз продаж", type: "sales_forecast" },
+    { label: "Товары на исходе (safety)", type: "low_stock" },
     { label: "Топ товары (30 дней)", type: "top_products_30d" },
     { label: "Продажи сегодня", type: "sales_today" },
     { label: "Продажи за 7 дней", type: "sales_7d" },
     { label: "Продажи за 30 дней", type: "sales_30d" },
     { label: "Прибыль за 30 дней", type: "profit_30d" },
-    { label: "Товары на исходе", type: "low_stock" },
     { label: "Статистика системы", type: "system_stats" },
   ];
 
