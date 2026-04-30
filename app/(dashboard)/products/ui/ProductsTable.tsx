@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { upsertProductAction } from "@/app/(dashboard)/products/actions";
+import { deleteProductAction, upsertProductAction } from "@/app/(dashboard)/products/actions";
 
 type ProductRow = {
   id: string;
@@ -57,6 +57,7 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [extraCategories, setExtraCategories] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<ProductRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const rows = useMemo(() => props.rows, [props.rows]);
 
@@ -151,13 +152,25 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">{r.safety_stock}</td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">{r.reorder_point}</td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => startEdit(r)}
-                      className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
-                    >
-                      Изменить
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(r)}
+                        className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+                      >
+                        Изменить
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setConfirmDelete(r);
+                        }}
+                        className="rounded-xl border border-red-200 bg-white px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 dark:border-red-900/40 dark:bg-zinc-950 dark:text-red-300 dark:hover:bg-red-950/30"
+                      >
+                        Удалить
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -195,6 +208,43 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
             Сохранить
           </button>
         </form>
+      </Modal>
+
+      <Modal open={!!confirmDelete} title="Удалить товар" onClose={() => setConfirmDelete(null)}>
+        <div className="space-y-3">
+          <div className="text-sm text-zinc-700 dark:text-zinc-200">
+            Удалить товар <span className="font-semibold">«{confirmDelete?.name}»</span>? Это действие нельзя отменить.
+          </div>
+          {error ? <div className="text-sm text-red-600">{error}</div> : null}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(null)}
+              className="flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+            >
+              Отмена
+            </button>
+            <form
+              className="flex-1"
+              action={async (formData) => {
+                setError(null);
+                if (!confirmDelete) return;
+                formData.set("id", confirmDelete.id);
+                const res = await deleteProductAction(formData);
+                if (!res?.ok) {
+                  setError(res?.reason ?? "Не удалось удалить.");
+                  return;
+                }
+                setConfirmDelete(null);
+                window.location.reload();
+              }}
+            >
+              <button type="submit" className="w-full rounded-xl bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700">
+                Удалить
+              </button>
+            </form>
+          </div>
+        </div>
       </Modal>
 
       <Modal open={openCategories} title="Категории" onClose={() => setOpenCategories(false)}>

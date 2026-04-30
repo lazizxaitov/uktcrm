@@ -34,3 +34,17 @@ export async function upsertCustomerAction(formData: FormData) {
   return { ok: true as const };
 }
 
+export async function deleteCustomerAction(formData: FormData) {
+  const user = await requireUser();
+  const database = db();
+  const id = str(formData, "id");
+  if (!id) return { ok: false as const, reason: "Нет клиента." };
+
+  const sales = database.prepare("SELECT COUNT(1) as cnt FROM sales WHERE customer_id=?").get(id) as { cnt: number };
+  if (sales.cnt > 0) return { ok: false as const, reason: "Нельзя удалить: есть продажи/чеки у клиента." };
+
+  const row = database.prepare("SELECT name, phone FROM customers WHERE id=?").get(id) as { name?: string; phone?: string } | undefined;
+  database.prepare("DELETE FROM customers WHERE id=?").run(id);
+  logAudit({ userId: user.id, action: "DELETE", entity: "customer", entityId: id, payload: { name: row?.name, phone: row?.phone } });
+  return { ok: true as const };
+}
