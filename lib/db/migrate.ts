@@ -1,0 +1,112 @@
+import { db } from "@/lib/db/db";
+import crypto from "node:crypto";
+
+function sha256(input: string) {
+  return crypto.createHash("sha256").update(input).digest("hex");
+}
+
+export function migrate() {
+  const database = db();
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      role TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      message TEXT NOT NULL,
+      is_read INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS audit (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      entity TEXT NOT NULL,
+      entity_id TEXT,
+      payload TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      sku TEXT NOT NULL UNIQUE,
+      barcode TEXT,
+      category TEXT,
+      box_size INTEGER,
+      safety_stock TEXT NOT NULL DEFAULT '0',
+      reorder_point TEXT NOT NULL DEFAULT '0',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS customers (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      phone TEXT,
+      debt_limit TEXT NOT NULL DEFAULT '0',
+      debt_days INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS sales (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT,
+      status TEXT NOT NULL, -- OPEN | CLOSED | REFUNDED
+      currency TEXT NOT NULL DEFAULT 'UZS',
+      total TEXT NOT NULL DEFAULT '0',
+      paid TEXT NOT NULL DEFAULT '0',
+      deposit_delta TEXT NOT NULL DEFAULT '0',
+      seller_delta TEXT NOT NULL DEFAULT '0',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      closed_at TEXT,
+      FOREIGN KEY(customer_id) REFERENCES customers(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS sale_items (
+      id TEXT PRIMARY KEY,
+      sale_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      qty TEXT NOT NULL,
+      price TEXT NOT NULL,
+      total TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(sale_id) REFERENCES sales(id) ON DELETE CASCADE,
+      FOREIGN KEY(product_id) REFERENCES products(id)
+    );
+  `);
+
+  // seed admin
+  const count = database.prepare("SELECT COUNT(1) as cnt FROM users").get() as { cnt: number };
+  if (count.cnt === 0) {
+    database
+      .prepare("INSERT INTO users (id, name, email, role, password_hash) VALUES (?, ?, ?, ?, ?)")
+      .run("u_admin", "Admin", "admin@local", "Admin", sha256("admin"));
+    database
+      .prepare("INSERT INTO notifications (id, type, message) VALUES (?, ?, ?)")
+      .run("n_welcome", "system", "Добро пожаловать в UKT CRM. Логин: admin@local, пароль: admin");
+  }
+}
+
