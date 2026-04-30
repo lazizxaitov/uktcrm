@@ -53,8 +53,30 @@ function Modal(props: { open: boolean; title: string; onClose: () => void; child
 export default function ProductsTable(props: { rows: ProductRow[] }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ProductRow | null>(null);
+  const [openCategories, setOpenCategories] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [extraCategories, setExtraCategories] = useState<string[]>([]);
+  const [newCategory, setNewCategory] = useState("");
   const [error, setError] = useState<string | null>(null);
   const rows = useMemo(() => props.rows, [props.rows]);
+
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) {
+      const c = (r.category ?? "").trim();
+      if (c) set.add(c);
+    }
+    for (const c of extraCategories) {
+      const v = c.trim();
+      if (v) set.add(v);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ru"));
+  }, [rows, extraCategories]);
+
+  const filteredRows = useMemo(() => {
+    if (!categoryFilter) return rows;
+    return rows.filter((r) => (r.category ?? "").trim() === categoryFilter);
+  }, [rows, categoryFilter]);
 
   const startCreate = () => {
     setError(null);
@@ -71,10 +93,34 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex items-center justify-between px-4 py-3">
-        <div className="text-sm font-semibold">Список товаров</div>
-        <button type="button" onClick={startCreate} className="rounded-xl px-3 py-2 text-sm btn-primary">
-          Добавить
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="text-sm font-semibold">Список товаров</div>
+          {categoryFilter ? (
+            <button
+              type="button"
+              onClick={() => setCategoryFilter(null)}
+              className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+              title="Сбросить фильтр"
+            >
+              Категория: {categoryFilter} <span className="text-zinc-400">×</span>
+            </button>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setNewCategory("");
+              setOpenCategories(true);
+            }}
+            className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+          >
+            Категории
+          </button>
+          <button type="button" onClick={startCreate} className="rounded-xl px-3 py-2 text-sm btn-primary">
+            Добавить
+          </button>
+        </div>
       </div>
       <div className="border-t border-zinc-200 dark:border-zinc-800" />
       <div className="overflow-auto">
@@ -90,14 +136,14 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
+            {filteredRows.length === 0 ? (
               <tr>
                 <td className="px-4 py-8 text-center text-zinc-500" colSpan={6}>
-                  Нет товаров
+                  {rows.length === 0 ? "Нет товаров" : "Нет товаров в этой категории"}
                 </td>
               </tr>
             ) : (
-              rows.map((r) => (
+              filteredRows.map((r) => (
                 <tr key={r.id} className="border-t border-zinc-100 dark:border-zinc-900">
                   <td className="px-4 py-3">{r.name}</td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">{r.sku}</td>
@@ -150,7 +196,73 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
           </button>
         </form>
       </Modal>
+
+      <Modal open={openCategories} title="Категории" onClose={() => setOpenCategories(false)}>
+        <div className="space-y-4">
+          <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+            <div>
+              <label className="block text-xs font-medium text-zinc-600">Новая категория</label>
+              <input
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                placeholder="Напр. Напитки"
+                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const v = newCategory.trim();
+                if (!v) return;
+                const exists =
+                  categories.some((c) => c.toLowerCase() === v.toLowerCase()) ||
+                  extraCategories.some((c) => c.toLowerCase() === v.toLowerCase());
+                if (!exists) setExtraCategories((prev) => [...prev, v]);
+                setCategoryFilter(v);
+                setOpenCategories(false);
+              }}
+              className="mt-5 rounded-xl px-4 py-2 text-sm btn-primary"
+            >
+              Создать
+            </button>
+          </div>
+
+          <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800">
+            <button
+              type="button"
+              onClick={() => {
+                setCategoryFilter(null);
+                setOpenCategories(false);
+              }}
+              className="flex w-full items-center justify-between px-4 py-3 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
+            >
+              <span className="font-medium">Все категории</span>
+              {!categoryFilter ? <span className="text-xs text-[var(--brand)]">Выбрано</span> : null}
+            </button>
+            <div className="border-t border-zinc-200 dark:border-zinc-800" />
+            <div className="max-h-[45vh] overflow-auto">
+              {categories.length === 0 ? (
+                <div className="px-4 py-6 text-sm text-zinc-500">Пока нет категорий.</div>
+              ) : (
+                categories.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      setCategoryFilter(c);
+                      setOpenCategories(false);
+                    }}
+                    className="flex w-full items-center justify-between px-4 py-3 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
+                  >
+                    <span className="truncate">{c}</span>
+                    {categoryFilter === c ? <span className="text-xs text-[var(--brand)]">Выбрано</span> : null}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
-
