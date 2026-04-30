@@ -8,6 +8,11 @@ function sha256(input: string) {
 export function migrate() {
   const database = db();
 
+  const hasColumn = (table: string, column: string) => {
+    const rows = database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    return rows.some((r) => r.name === column);
+  };
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS meta (
       key TEXT PRIMARY KEY,
@@ -20,6 +25,7 @@ export function migrate() {
       email TEXT NOT NULL UNIQUE,
       role TEXT NOT NULL,
       password_hash TEXT NOT NULL,
+      seller_balance TEXT NOT NULL DEFAULT '0',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -66,6 +72,7 @@ export function migrate() {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       phone TEXT,
+      deposit_balance TEXT NOT NULL DEFAULT '0',
       debt_limit TEXT NOT NULL DEFAULT '0',
       debt_days INTEGER,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -76,6 +83,7 @@ export function migrate() {
       customer_id TEXT,
       status TEXT NOT NULL, -- OPEN | CLOSED | REFUNDED
       currency TEXT NOT NULL DEFAULT 'UZS',
+      fx_rate_used TEXT,
       total TEXT NOT NULL DEFAULT '0',
       paid TEXT NOT NULL DEFAULT '0',
       deposit_delta TEXT NOT NULL DEFAULT '0',
@@ -132,6 +140,17 @@ export function migrate() {
       FOREIGN KEY(batch_id) REFERENCES stock_batches(id)
     );
   `);
+
+  // Lightweight schema upgrades for existing DBs
+  if (!hasColumn("users", "seller_balance")) {
+    database.exec("ALTER TABLE users ADD COLUMN seller_balance TEXT NOT NULL DEFAULT '0'");
+  }
+  if (!hasColumn("customers", "deposit_balance")) {
+    database.exec("ALTER TABLE customers ADD COLUMN deposit_balance TEXT NOT NULL DEFAULT '0'");
+  }
+  if (!hasColumn("sales", "fx_rate_used")) {
+    database.exec("ALTER TABLE sales ADD COLUMN fx_rate_used TEXT");
+  }
 
   // seed admin
   const count = database.prepare("SELECT COUNT(1) as cnt FROM users").get() as { cnt: number };
