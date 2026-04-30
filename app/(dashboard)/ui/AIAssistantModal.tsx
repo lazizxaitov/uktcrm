@@ -48,7 +48,6 @@ export default function AIAssistantModal(props: { open: boolean; onClose: () => 
       text: "Выберите готовый вопрос — я покажу аналитику по вашей базе.",
     },
   ]);
-  const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
 
@@ -76,17 +75,6 @@ export default function AIAssistantModal(props: { open: boolean; onClose: () => 
     setLoading(false);
   };
 
-  const sendFree = async () => {
-    const text = input.trim();
-    if (!text || loading) return;
-    setInput("");
-    setLoading(true);
-    setMessages((prev) => [...prev, { role: "user", text }]);
-    const ans = await ask("free", text);
-    setMessages((prev) => [...prev, { role: "assistant", text: `${ans.title}\n\n${ans.text}`.trim() }]);
-    setLoading(false);
-  };
-
   return (
     <Modal open={props.open} title="AI ассистент" onClose={props.onClose}>
       <div className="grid gap-4 md:grid-cols-[260px_1fr]">
@@ -104,7 +92,6 @@ export default function AIAssistantModal(props: { open: boolean; onClose: () => 
               </button>
             ))}
           </div>
-          <div className="mt-3 text-xs text-zinc-500">Можно писать свой вопрос — я попробую понять.</div>
         </div>
 
         <div className="flex min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
@@ -127,28 +114,8 @@ export default function AIAssistantModal(props: { open: boolean; onClose: () => 
               {loading ? <div className="text-xs text-zinc-500">Думаю…</div> : null}
             </div>
           </div>
-          <div className="border-t border-zinc-200 p-3 dark:border-zinc-800">
-            <div className="flex gap-2">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Напишите вопрос…"
-                className="flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    sendFree();
-                  }
-                }}
-              />
-              <button type="button" onClick={sendFree} className="rounded-xl px-4 py-2 text-sm btn-primary">
-                Отправить
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </Modal>
   );
 }
-
