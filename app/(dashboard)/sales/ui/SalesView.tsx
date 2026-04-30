@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addSaleItemAction, closeSaleAction, openSaleAction, refundSaleAction, removeSaleItemAction } from "@/app/(dashboard)/sales/actions";
 import { useConfirmDialog } from "@/app/components/useConfirmDialog";
 
@@ -75,6 +75,34 @@ export default function SalesView(props: {
   const openItems = props.openItems;
 
   const { confirm, dialog } = useConfirmDialog();
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const open = sp.get("open") === "1";
+    const add = sp.get("add") === "1";
+    if (!open && !add) return;
+    sp.delete("open");
+    sp.delete("add");
+    const next = sp.toString();
+    const url = `${window.location.pathname}${next ? `?${next}` : ""}`;
+    window.history.replaceState(null, "", url);
+
+    if (open) {
+      setDirtyOpen(false);
+      setOpenOpen(true);
+      return;
+    }
+    if (add) {
+      if (openSale) {
+        setDirtyAdd(false);
+        setOpenAdd(true);
+      } else {
+        setDirtyOpen(false);
+        setOpenOpen(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="space-y-4">

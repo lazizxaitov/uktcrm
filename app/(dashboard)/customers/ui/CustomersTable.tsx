@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { deleteCustomerAction, upsertCustomerAction } from "@/app/(dashboard)/customers/actions";
 import { useConfirmDialog } from "@/app/components/useConfirmDialog";
 
@@ -63,6 +63,19 @@ export default function CustomersTable(props: { rows: CustomerRow[] }) {
   const rows = useMemo(() => props.rows, [props.rows]);
 
   const { confirm, dialog } = useConfirmDialog();
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("new") !== "1") return;
+    sp.delete("new");
+    const next = sp.toString();
+    const url = `${window.location.pathname}${next ? `?${next}` : ""}`;
+    window.history.replaceState(null, "", url);
+    setError(null);
+    setEditing(null);
+    setDirtyCustomer(false);
+    setOpen(true);
+  }, []);
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">

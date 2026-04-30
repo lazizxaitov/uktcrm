@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { markAllNotificationsReadAction, markNotificationReadAction } from "@/app/(dashboard)/notifications/actions";
 
 type NotificationItem = {
@@ -14,7 +15,9 @@ export default function HeaderActions(props: {
   unreadCount: number;
   notifications: NotificationItem[];
 }) {
+  const router = useRouter();
   const [openNotifications, setOpenNotifications] = useState(false);
+  const [openQuick, setOpenQuick] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -23,6 +26,7 @@ export default function HeaderActions(props: {
       if (!el) return;
       if (!rootRef.current?.contains(el)) {
         setOpenNotifications(false);
+        setOpenQuick(false);
       }
     };
     window.addEventListener("mousedown", onClick);
@@ -33,6 +37,7 @@ export default function HeaderActions(props: {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       setOpenNotifications(false);
+      setOpenQuick(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -44,7 +49,60 @@ export default function HeaderActions(props: {
         <button
           type="button"
           onClick={() => {
+            setOpenQuick((v) => !v);
+            setOpenNotifications(false);
+          }}
+          className="relative inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+          aria-label="Быстрое действие"
+          title="Быстрое действие"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5v14" />
+            <path d="M5 12h14" />
+          </svg>
+          <span className="hidden md:inline">Быстрое</span>
+        </button>
+
+        {openQuick ? (
+          <div className="absolute right-0 mt-2 w-[320px] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="border-b border-zinc-200 px-4 py-3 text-sm font-semibold dark:border-zinc-800">Быстрые действия</div>
+            <div className="p-2">
+              {[
+                { label: "Создать чек", desc: "Продажи", href: "/sales?open=1" },
+                { label: "Приход товара", desc: "Склад", href: "/stock?receipt=1" },
+                { label: "Создать товар", desc: "Товары", href: "/products?new=1" },
+                { label: "Создать клиента", desc: "Клиенты", href: "/customers?new=1" },
+                { label: "Отчёты", desc: "Аналитика", href: "/reports" },
+              ].map((item) => (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => {
+                    setOpenQuick(false);
+                    router.push(item.href);
+                  }}
+                  className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">{item.label}</div>
+                    <div className="truncate text-xs text-zinc-500">{item.desc}</div>
+                  </div>
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 text-zinc-400" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => {
             setOpenNotifications((v) => !v);
+            setOpenQuick(false);
           }}
           className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
           aria-label="Уведомления"

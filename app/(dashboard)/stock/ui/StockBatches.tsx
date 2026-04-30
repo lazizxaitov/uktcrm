@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addStockReceiptAction } from "@/app/(dashboard)/stock/actions";
 import SelectProductsModal from "@/app/(dashboard)/stock/ui/SelectProductsModal";
 import { useConfirmDialog } from "@/app/components/useConfirmDialog";
@@ -70,6 +70,19 @@ export default function StockBatches(props: { products: ProductOption[]; batches
   const batches = useMemo(() => props.batches, [props.batches]);
 
   const { confirm, dialog } = useConfirmDialog();
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("receipt") !== "1") return;
+    sp.delete("receipt");
+    const next = sp.toString();
+    const url = `${window.location.pathname}${next ? `?${next}` : ""}`;
+    window.history.replaceState(null, "", url);
+    setError(null);
+    setSelectedProductIds([]);
+    setDirtyReceipt(false);
+    setOpenReceipt(true);
+  }, []);
 
   return (
     <div className="space-y-4">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { deleteProductAction, upsertProductAction } from "@/app/(dashboard)/products/actions";
 import { useConfirmDialog } from "@/app/components/useConfirmDialog";
 
@@ -101,6 +101,17 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
     setDirtyProduct(false);
     setOpen(true);
   };
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("new") !== "1") return;
+    sp.delete("new");
+    const next = sp.toString();
+    const url = `${window.location.pathname}${next ? `?${next}` : ""}`;
+    window.history.replaceState(null, "", url);
+    startCreate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
