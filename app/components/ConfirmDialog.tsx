@@ -20,13 +20,6 @@ export default function ConfirmDialog(props: {
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
         <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
           <div className="text-sm font-semibold">{props.title ?? "Подтверждение"}</div>
-          <button
-            type="button"
-            onClick={props.onCancel}
-            className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
-          >
-            Закрыть
-          </button>
         </div>
         <div className="p-5">
           <div className="text-sm text-zinc-700 dark:text-zinc-200">{props.message}</div>
@@ -47,4 +40,3 @@ export default function ConfirmDialog(props: {
     </div>
   );
 }
-
