@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { markAllNotificationsReadAction, markNotificationReadAction } from "@/app/(dashboard)/notifications/actions";
+import AIAssistantModal from "@/app/(dashboard)/ui/AIAssistantModal";
 
 type NotificationItem = {
   id: string;
@@ -18,6 +19,7 @@ export default function HeaderActions(props: {
   const router = useRouter();
   const [openNotifications, setOpenNotifications] = useState(false);
   const [openQuick, setOpenQuick] = useState(false);
+  const [openAi, setOpenAi] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -38,6 +40,7 @@ export default function HeaderActions(props: {
       if (e.key !== "Escape") return;
       setOpenNotifications(false);
       setOpenQuick(false);
+      setOpenAi(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -96,6 +99,25 @@ export default function HeaderActions(props: {
           </div>
         ) : null}
       </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          setOpenAi(true);
+          setOpenNotifications(false);
+          setOpenQuick(false);
+        }}
+        className="relative inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
+        aria-label="AI ассистент"
+        title="AI ассистент"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2l1.2 3.6L17 7l-3.8 1.4L12 12l-1.2-3.6L7 7l3.8-1.4L12 2Z" />
+          <path d="M19 12l.8 2.4L22 15l-2.2.6L19 18l-.8-2.4L16 15l2.2-.6L19 12Z" />
+          <path d="M5 13l.8 2.4L8 16l-2.2.6L5 19l-.8-2.4L2 16l2.2-.6L5 13Z" />
+        </svg>
+        <span className="hidden md:inline">AI</span>
+      </button>
 
       <div className="relative">
         <button
@@ -170,6 +192,8 @@ export default function HeaderActions(props: {
           </div>
         ) : null}
       </div>
+
+      <AIAssistantModal open={openAi} onClose={() => setOpenAi(false)} />
     </div>
   );
 }
