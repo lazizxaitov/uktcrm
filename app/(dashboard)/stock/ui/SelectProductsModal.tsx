@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useConfirmDialog } from "@/app/components/useConfirmDialog";
 
 type ProductOption = { id: string; name: string; sku: string };
 
@@ -64,12 +65,20 @@ export default function SelectProductsModal(props: {
     setSelected((prev) => prev.filter((x) => x !== id));
   }
 
-  const confirmClose = () => window.confirm("Есть несохранённые данные. Закрыть без сохранения?");
   const isDirty =
     selected.length !== props.selectedIds.length || selected.some((id, i) => id !== props.selectedIds[i]);
+  const { confirm, dialog } = useConfirmDialog();
   const requestClose = () => {
-    if (isDirty && !confirmClose()) return;
-    props.onClose();
+    if (!isDirty) {
+      props.onClose();
+      return;
+    }
+    confirm(() => props.onClose(), {
+      title: "Несохранённые данные",
+      message: "Вы изменили список выбранных товаров. Закрыть без сохранения?",
+      confirmText: "Закрыть",
+      cancelText: "Не закрывать",
+    });
   };
 
   return (
@@ -183,6 +192,8 @@ export default function SelectProductsModal(props: {
           </div>
         </div>
       </div>
+
+      {dialog}
     </Modal>
   );
 }

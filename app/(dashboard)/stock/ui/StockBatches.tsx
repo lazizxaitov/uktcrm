@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { addStockReceiptAction } from "@/app/(dashboard)/stock/actions";
 import SelectProductsModal from "@/app/(dashboard)/stock/ui/SelectProductsModal";
+import { useConfirmDialog } from "@/app/components/useConfirmDialog";
 
 type ProductOption = { id: string; name: string; sku: string };
 type BatchRow = {
@@ -68,7 +69,7 @@ export default function StockBatches(props: { products: ProductOption[]; batches
   const products = useMemo(() => props.products, [props.products]);
   const batches = useMemo(() => props.batches, [props.batches]);
 
-  const confirmClose = () => window.confirm("Есть несохранённые данные. Закрыть без сохранения?");
+  const { confirm, dialog } = useConfirmDialog();
 
   return (
     <div className="space-y-4">
@@ -129,8 +130,16 @@ export default function StockBatches(props: { products: ProductOption[]; batches
         open={openReceipt}
         title="Приход партии"
         onClose={() => {
-          if (dirtyReceipt && !confirmClose()) return;
-          setOpenReceipt(false);
+          if (!dirtyReceipt) {
+            setOpenReceipt(false);
+            return;
+          }
+          confirm(() => setOpenReceipt(false), {
+            title: "Несохранённые данные",
+            message: "Есть несохранённые изменения. Закрыть без сохранения?",
+            confirmText: "Закрыть",
+            cancelText: "Не закрывать",
+          });
         }}
       >
         <form
@@ -229,6 +238,8 @@ export default function StockBatches(props: { products: ProductOption[]; batches
           setOpenSelectProducts(false);
         }}
       />
+
+      {dialog}
     </div>
   );
 }

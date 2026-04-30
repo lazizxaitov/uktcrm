@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { deleteCustomerAction, upsertCustomerAction } from "@/app/(dashboard)/customers/actions";
+import { useConfirmDialog } from "@/app/components/useConfirmDialog";
 
 type CustomerRow = {
   id: string;
@@ -61,7 +62,7 @@ export default function CustomersTable(props: { rows: CustomerRow[] }) {
   const [error, setError] = useState<string | null>(null);
   const rows = useMemo(() => props.rows, [props.rows]);
 
-  const confirmClose = () => window.confirm("Есть несохранённые данные. Закрыть без сохранения?");
+  const { confirm, dialog } = useConfirmDialog();
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
@@ -143,8 +144,16 @@ export default function CustomersTable(props: { rows: CustomerRow[] }) {
         open={open}
         title={editing ? "Редактировать клиента" : "Новый клиент"}
         onClose={() => {
-          if (dirtyCustomer && !confirmClose()) return;
-          setOpen(false);
+          if (!dirtyCustomer) {
+            setOpen(false);
+            return;
+          }
+          confirm(() => setOpen(false), {
+            title: "Несохранённые данные",
+            message: "Есть несохранённые изменения. Закрыть без сохранения?",
+            confirmText: "Закрыть",
+            cancelText: "Не закрывать",
+          });
         }}
       >
         <form
@@ -211,6 +220,8 @@ export default function CustomersTable(props: { rows: CustomerRow[] }) {
           </div>
         </div>
       </Modal>
+
+      {dialog}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { addSaleItemAction, closeSaleAction, openSaleAction, refundSaleAction, removeSaleItemAction } from "@/app/(dashboard)/sales/actions";
+import { useConfirmDialog } from "@/app/components/useConfirmDialog";
 
 type CustomerOption = { id: string; name: string };
 type ProductOption = { id: string; name: string; sku: string };
@@ -73,7 +74,7 @@ export default function SalesView(props: {
   const openSale = props.openSale;
   const openItems = props.openItems;
 
-  const confirmClose = () => window.confirm("Есть несохранённые данные. Закрыть без сохранения?");
+  const { confirm, dialog } = useConfirmDialog();
 
   return (
     <div className="space-y-4">
@@ -259,8 +260,16 @@ export default function SalesView(props: {
         open={openOpen}
         title="Открыть чек"
         onClose={() => {
-          if (dirtyOpen && !confirmClose()) return;
-          setOpenOpen(false);
+          if (!dirtyOpen) {
+            setOpenOpen(false);
+            return;
+          }
+          confirm(() => setOpenOpen(false), {
+            title: "Несохранённые данные",
+            message: "Есть несохранённые изменения. Закрыть без сохранения?",
+            confirmText: "Закрыть",
+            cancelText: "Не закрывать",
+          });
         }}
       >
         <form
@@ -309,8 +318,16 @@ export default function SalesView(props: {
         open={openAdd}
         title="Добавить позицию"
         onClose={() => {
-          if (dirtyAdd && !confirmClose()) return;
-          setOpenAdd(false);
+          if (!dirtyAdd) {
+            setOpenAdd(false);
+            return;
+          }
+          confirm(() => setOpenAdd(false), {
+            title: "Несохранённые данные",
+            message: "Есть несохранённые изменения. Закрыть без сохранения?",
+            confirmText: "Закрыть",
+            cancelText: "Не закрывать",
+          });
         }}
       >
         <form
@@ -353,8 +370,16 @@ export default function SalesView(props: {
         open={openClose}
         title="Закрыть чек"
         onClose={() => {
-          if (dirtyClose && !confirmClose()) return;
-          setOpenClose(false);
+          if (!dirtyClose) {
+            setOpenClose(false);
+            return;
+          }
+          confirm(() => setOpenClose(false), {
+            title: "Несохранённые данные",
+            message: "Есть несохранённые изменения. Закрыть без сохранения?",
+            confirmText: "Закрыть",
+            cancelText: "Не закрывать",
+          });
         }}
       >
         <form
@@ -403,6 +428,8 @@ export default function SalesView(props: {
           </form>
         </div>
       </Modal>
+
+      {dialog}
     </div>
   );
 }

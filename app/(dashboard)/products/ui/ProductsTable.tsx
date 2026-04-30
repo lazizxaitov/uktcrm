@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { deleteProductAction, upsertProductAction } from "@/app/(dashboard)/products/actions";
+import { useConfirmDialog } from "@/app/components/useConfirmDialog";
 
 type ProductRow = {
   id: string;
@@ -67,7 +68,7 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
   const [error, setError] = useState<string | null>(null);
   const rows = useMemo(() => props.rows, [props.rows]);
 
-  const confirmClose = () => window.confirm("Есть несохранённые данные. Закрыть без сохранения?");
+  const { confirm, dialog } = useConfirmDialog();
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -193,8 +194,16 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
         open={open}
         title={editing ? "Редактировать товар" : "Новый товар"}
         onClose={() => {
-          if (dirtyProduct && !confirmClose()) return;
-          setOpen(false);
+          if (!dirtyProduct) {
+            setOpen(false);
+            return;
+          }
+          confirm(() => setOpen(false), {
+            title: "Несохранённые данные",
+            message: "Есть несохранённые изменения. Закрыть без сохранения?",
+            confirmText: "Закрыть",
+            cancelText: "Не закрывать",
+          });
         }}
       >
         <form
@@ -269,8 +278,16 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
         open={openCategories}
         title="Категории"
         onClose={() => {
-          if (newCategory.trim() && !confirmClose()) return;
-          setOpenCategories(false);
+          if (!newCategory.trim()) {
+            setOpenCategories(false);
+            return;
+          }
+          confirm(() => setOpenCategories(false), {
+            title: "Несохранённые данные",
+            message: "Вы начали вводить новую категорию. Закрыть без сохранения?",
+            confirmText: "Закрыть",
+            cancelText: "Не закрывать",
+          });
         }}
       >
         <div className="space-y-4">
@@ -338,6 +355,8 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
           </div>
         </div>
       </Modal>
+
+      {dialog}
     </div>
   );
 }
