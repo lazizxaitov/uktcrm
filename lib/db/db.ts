@@ -12,3 +12,11 @@ export function db() {
   return singleton;
 }
 
+export function closeDb() {
+  if (!singleton) return;
+  try {
+    singleton.close();
+  } finally {
+    singleton = null;
+  }
+}
