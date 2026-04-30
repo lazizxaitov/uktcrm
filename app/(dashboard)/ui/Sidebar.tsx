@@ -62,6 +62,18 @@ function Icons() {
         <path d="M14 3v5h5" />
       </svg>
     ),
+    audit: (
+      <svg {...p}>
+        <path d="M12 2l7 4v6c0 5-3 9-7 10-4-1-7-5-7-10V6l7-4z" />
+        <path d="M9 12l2 2 4-5" />
+      </svg>
+    ),
+    settings: (
+      <svg {...p}>
+        <path d="M12 15.5a3.5 3.5 0 110-7 3.5 3.5 0 010 7z" />
+        <path d="M19.4 15a7.9 7.9 0 00.1-2l2-1.2-2-3.4-2.3.7a7.6 7.6 0 00-1.7-1L13 4h-2L9.6 8.1a7.6 7.6 0 00-1.7 1l-2.3-.7-2 3.4L5.6 13a7.9 7.9 0 00.1 2l-2 1.2 2 3.4 2.3-.7a7.6 7.6 0 001.7 1L11 22h2l1.4-4.1a7.6 7.6 0 001.7-1l2.3.7 2-3.4L19.4 15z" />
+      </svg>
+    ),
   };
 }
 
@@ -82,6 +94,7 @@ export default function Sidebar(props: { userName: string; userRole: string }) {
   const pathname = usePathname();
   const icons = useMemo(() => Icons(), []);
   const [collapsed, setCollapsed] = useState(false);
+  const [tooltip, setTooltip] = useState<{ text: string; icon: React.ReactNode; top: number; left: number } | null>(null);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("uktcrm.sidebar.collapsed");
@@ -92,6 +105,21 @@ export default function Sidebar(props: { userName: string; userRole: string }) {
     window.localStorage.setItem("uktcrm.sidebar.collapsed", collapsed ? "1" : "0");
   }, [collapsed]);
 
+  useEffect(() => {
+    if (!collapsed && tooltip) setTooltip(null);
+  }, [collapsed, tooltip]);
+
+  const showTooltipFor = (rect: DOMRect, text: string, icon: React.ReactNode) => {
+    const width = 240; // ~кнопка как в раскрытом виде
+    const padding = 12;
+    let left = rect.right + padding;
+    if (typeof window !== "undefined") {
+      left = Math.min(left, window.innerWidth - width - 12);
+      left = Math.max(12, left);
+    }
+    setTooltip({ text, icon, top: rect.top + rect.height / 2, left });
+  };
+
   const nav: NavItem[] = [
     { href: "/dashboard", label: "Панель", icon: icons.dashboard },
     { href: "/sales", label: "Продажи", icon: icons.sales },
@@ -99,15 +127,26 @@ export default function Sidebar(props: { userName: string; userRole: string }) {
     { href: "/products", label: "Товары", icon: icons.products },
     { href: "/customers", label: "Клиенты", icon: icons.customers },
     { href: "/reports", label: "Отчёты", icon: icons.reports },
+    { href: "/audit", label: "Аудит", icon: icons.audit },
+    { href: "/settings", label: "Настройки", icon: icons.settings },
   ];
 
   return (
     <aside
       className={[
-        "hidden h-screen shrink-0 flex-col border-r border-zinc-200 bg-white px-3 pt-3 pb-3 dark:border-zinc-800 dark:bg-zinc-950 md:flex",
+        "relative hidden h-screen shrink-0 flex-col border-r border-zinc-200 bg-white px-3 pt-3 pb-3 dark:border-zinc-800 dark:bg-zinc-950 md:flex",
         collapsed ? "w-[76px]" : "w-64",
       ].join(" ")}
     >
+      {collapsed && tooltip ? (
+        <div className="pointer-events-none fixed z-[9999] -translate-y-1/2" style={{ top: tooltip.top, left: tooltip.left }}>
+          <div className="flex h-12 w-60 items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-2 py-1.5 text-sm text-zinc-900 shadow-xl dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50">
+            <IconWrap active={false}>{tooltip.icon}</IconWrap>
+            <span className="truncate font-medium">{tooltip.text}</span>
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex items-center justify-between gap-2 px-1">
         <Link href="/dashboard" className="flex items-center gap-2 overflow-hidden">
           <span className="inline-flex items-center rounded-xl px-2 py-1 text-xs badge-brand font-semibold">UKT</span>
@@ -135,7 +174,23 @@ export default function Sidebar(props: { userName: string; userRole: string }) {
             <Link
               key={item.href}
               href={item.href}
-              title={collapsed ? item.label : undefined}
+              onMouseEnter={(e) => {
+                if (!collapsed) return;
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                showTooltipFor(rect, item.label, item.icon);
+              }}
+              onMouseMove={(e) => {
+                if (!collapsed) return;
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                showTooltipFor(rect, item.label, item.icon);
+              }}
+              onMouseLeave={() => setTooltip(null)}
+              onFocus={(e) => {
+                if (!collapsed) return;
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                showTooltipFor(rect, item.label, item.icon);
+              }}
+              onBlur={() => setTooltip(null)}
               className={[
                 "flex items-center gap-3 rounded-2xl px-2 py-1.5 text-sm transition-colors",
                 active ? "bg-[var(--brand-soft)] text-[var(--brand)]" : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-900",
@@ -170,4 +225,3 @@ export default function Sidebar(props: { userName: string; userRole: string }) {
     </aside>
   );
 }
-

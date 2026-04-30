@@ -29,9 +29,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <span>CRM</span>
           </Link>
           <HeaderActions
-            userName={user.name}
-            userEmail={user.email}
-            userRole={user.role}
             unreadCount={unread.cnt}
             notifications={notifications}
           />
@@ -41,4 +38,3 @@ export default async function DashboardLayout({ children }: { children: React.Re
     </div>
   );
 }
-

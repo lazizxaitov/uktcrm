@@ -96,6 +96,41 @@ export function migrate() {
       FOREIGN KEY(sale_id) REFERENCES sales(id) ON DELETE CASCADE,
       FOREIGN KEY(product_id) REFERENCES products(id)
     );
+
+    CREATE TABLE IF NOT EXISTS stock_batches (
+      id TEXT PRIMARY KEY,
+      product_id TEXT NOT NULL,
+      qty_initial TEXT NOT NULL,
+      qty_remaining TEXT NOT NULL,
+      cost TEXT NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'UZS', -- UZS | USD
+      fx_rate TEXT, -- USD->UZS rate at purchase
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(product_id) REFERENCES products(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS payments (
+      id TEXT PRIMARY KEY,
+      sale_id TEXT NOT NULL,
+      method TEXT NOT NULL, -- CASH | CARD | MIX
+      currency TEXT NOT NULL DEFAULT 'UZS',
+      amount TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(sale_id) REFERENCES sales(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS sale_allocations (
+      id TEXT PRIMARY KEY,
+      sale_item_id TEXT NOT NULL,
+      batch_id TEXT NOT NULL,
+      qty TEXT NOT NULL,
+      cost TEXT NOT NULL,
+      currency TEXT NOT NULL,
+      fx_rate TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY(sale_item_id) REFERENCES sale_items(id) ON DELETE CASCADE,
+      FOREIGN KEY(batch_id) REFERENCES stock_batches(id)
+    );
   `);
 
   // seed admin
@@ -108,5 +143,10 @@ export function migrate() {
       .prepare("INSERT INTO notifications (id, type, message) VALUES (?, ?, ?)")
       .run("n_welcome", "system", "Добро пожаловать в UKT CRM. Логин: admin@local, пароль: admin");
   }
-}
 
+  const metaCnt = database.prepare("SELECT COUNT(1) as cnt FROM meta").get() as { cnt: number };
+  if (metaCnt.cnt === 0) {
+    database.prepare("INSERT INTO meta (key, value) VALUES (?, ?)").run("fx_usd_uzs", "12500");
+    database.prepare("INSERT INTO meta (key, value) VALUES (?, ?)").run("overpay_mode", "DEPOSIT"); // DEPOSIT | SELLER_MINUS
+  }
+}

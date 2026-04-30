@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { markAllNotificationsReadAction, markNotificationReadAction } from "@/app/(dashboard)/notifications/actions";
-import { logoutAction } from "@/app/(dashboard)/actions";
 
 type NotificationItem = {
   id: string;
@@ -13,13 +11,9 @@ type NotificationItem = {
 };
 
 export default function HeaderActions(props: {
-  userName: string;
-  userEmail: string;
-  userRole: string;
   unreadCount: number;
   notifications: NotificationItem[];
 }) {
-  const [openProfile, setOpenProfile] = useState(false);
   const [openNotifications, setOpenNotifications] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -28,7 +22,6 @@ export default function HeaderActions(props: {
       const el = e.target as Node | null;
       if (!el) return;
       if (!rootRef.current?.contains(el)) {
-        setOpenProfile(false);
         setOpenNotifications(false);
       }
     };
@@ -39,7 +32,6 @@ export default function HeaderActions(props: {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      setOpenProfile(false);
       setOpenNotifications(false);
     };
     window.addEventListener("keydown", onKey);
@@ -53,7 +45,6 @@ export default function HeaderActions(props: {
           type="button"
           onClick={() => {
             setOpenNotifications((v) => !v);
-            setOpenProfile(false);
           }}
           className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
           aria-label="Уведомления"
@@ -121,56 +112,6 @@ export default function HeaderActions(props: {
           </div>
         ) : null}
       </div>
-
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => {
-            setOpenProfile((v) => !v);
-            setOpenNotifications(false);
-          }}
-          className="inline-flex h-10 min-w-[220px] items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-3 text-sm hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
-        >
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full badge-brand text-xs font-semibold">
-              {props.userName.slice(0, 1).toUpperCase()}
-            </span>
-            <div className="min-w-0 text-left">
-              <div className="truncate text-xs font-semibold leading-4">{props.userName}</div>
-              <div className="truncate text-[11px] text-zinc-500">{props.userRole}</div>
-            </div>
-          </div>
-          <span className="text-xs text-zinc-500">▼</span>
-        </button>
-
-        {openProfile ? (
-          <div className="absolute right-0 mt-2 w-80 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
-            <div className="px-4 py-3">
-              <div className="text-sm font-semibold">{props.userName}</div>
-              <div className="text-xs text-zinc-500">{props.userEmail}</div>
-              <div className="mt-0.5 text-[11px] text-zinc-500">{props.userRole}</div>
-            </div>
-            <div className="border-t border-zinc-200 dark:border-zinc-800" />
-            <div className="p-2">
-              <Link className="block rounded-xl px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-900" href="/settings">
-                Настройки
-              </Link>
-              <Link className="mt-1 block rounded-xl px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-900" href="/audit">
-                Аудит
-              </Link>
-            </div>
-            <div className="border-t border-zinc-200 dark:border-zinc-800" />
-            <div className="p-3">
-              <form action={logoutAction}>
-                <button type="submit" className="block w-full rounded-xl px-3 py-2 text-center text-sm btn-secondary">
-                  Выйти
-                </button>
-              </form>
-            </div>
-          </div>
-        ) : null}
-      </div>
     </div>
   );
 }
-
