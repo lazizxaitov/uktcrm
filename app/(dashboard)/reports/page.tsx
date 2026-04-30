@@ -2,6 +2,7 @@ import { db } from "@/lib/db/db";
 import { migrate } from "@/lib/db/migrate";
 import Decimal from "decimal.js";
 import { getSettings } from "@/lib/settings/server";
+import DateField from "@/app/components/DateField";
 
 export const metadata = { title: "Отчёты • UKT CRM" };
 
@@ -183,11 +184,11 @@ export default async function ReportsPage(props: { searchParams?: Promise<Record
         <form className="flex flex-wrap items-end gap-3" action="/reports">
           <div>
             <label className="block text-xs font-medium text-zinc-600">С</label>
-            <input type="date" name="from" defaultValue={fromYmd} className="mt-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-950" />
+            <DateField name="from" defaultValue={fromYmd} />
           </div>
           <div>
             <label className="block text-xs font-medium text-zinc-600">По</label>
-            <input type="date" name="to" defaultValue={toYmd} className="mt-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-950" />
+            <DateField name="to" defaultValue={toYmd} />
           </div>
           <button type="submit" className="rounded-xl px-4 py-2 text-sm font-medium btn-primary">
             Показать
@@ -294,4 +295,3 @@ export default async function ReportsPage(props: { searchParams?: Promise<Record
     </div>
   );
 }
-

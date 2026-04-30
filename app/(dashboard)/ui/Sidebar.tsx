@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -152,8 +153,16 @@ export default function Sidebar(props: { userName: string; userRole: string }) {
 
       <div className="flex items-center justify-between gap-2 px-1">
         <Link href="/dashboard" className="flex items-center gap-2 overflow-hidden">
-          <span className="inline-flex items-center rounded-xl px-2 py-1 text-xs badge-brand font-semibold">UKT</span>
-          <span className={collapsed ? "hidden" : "text-xs font-semibold text-zinc-700"}>CRM</span>
+          <Image
+            src="/ukt-logo.png"
+            alt="UKT"
+            width={96}
+            height={22}
+            style={{ height: "22px", width: "auto" }}
+            className={collapsed ? "hidden" : ""}
+            priority
+          />
+          <span className={collapsed ? "inline-flex items-center rounded-xl px-2 py-1 text-xs badge-brand font-semibold" : "hidden"}>UKT</span>
         </Link>
         <button
           type="button"

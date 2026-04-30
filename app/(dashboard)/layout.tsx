@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { requireUser } from "@/lib/auth/server";
 import { migrate } from "@/lib/db/migrate";
 import { db } from "@/lib/db/db";
@@ -24,9 +25,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <Sidebar userName={user.name} userRole={user.role} />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950 md:px-6">
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm font-semibold">
-            <span className="inline-flex items-center rounded-full px-2 py-1 text-xs badge-brand">UKT</span>
-            <span>CRM</span>
+          <Link href="/dashboard" className="flex items-center gap-3">
+            <Image src="/ukt-logo.png" alt="UKT" width={100} height={22} style={{ height: "22px", width: "auto" }} priority />
           </Link>
           <HeaderActions
             unreadCount={unread.cnt}

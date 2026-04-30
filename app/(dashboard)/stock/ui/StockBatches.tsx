@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { addStockBatchAction } from "@/app/(dashboard)/stock/actions";
+import { addStockReceiptAction } from "@/app/(dashboard)/stock/actions";
+import SelectProductsModal from "@/app/(dashboard)/stock/ui/SelectProductsModal";
 
 type ProductOption = { id: string; name: string; sku: string };
 type BatchRow = {
@@ -53,8 +54,11 @@ function Field(props: { label: string; name: string; defaultValue?: string; type
 }
 
 export default function StockBatches(props: { products: ProductOption[]; batches: BatchRow[] }) {
-  const [open, setOpen] = useState(false);
+  const [openReceipt, setOpenReceipt] = useState(false);
+  const [openSelectProducts, setOpenSelectProducts] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+
   const products = useMemo(() => props.products, [props.products]);
   const batches = useMemo(() => props.batches, [props.batches]);
 
@@ -67,7 +71,8 @@ export default function StockBatches(props: { products: ProductOption[]; batches
             type="button"
             onClick={() => {
               setError(null);
-              setOpen(true);
+              setSelectedProductIds([]);
+              setOpenReceipt(true);
             }}
             className="rounded-xl px-3 py-2 text-sm btn-primary"
           >
@@ -111,38 +116,70 @@ export default function StockBatches(props: { products: ProductOption[]; batches
         </div>
       </div>
 
-      <Modal open={open} title="Приход партии" onClose={() => setOpen(false)}>
+      <Modal open={openReceipt} title="Приход партии" onClose={() => setOpenReceipt(false)}>
         <form
           action={async (formData) => {
             setError(null);
-            const res = await addStockBatchAction(formData);
-            if (!res?.ok) {
-              setError("Проверьте поля (товар, количество, себестоимость).");
+            const qty = String(formData.get("qty") ?? "").trim();
+            const cost = String(formData.get("cost") ?? "").trim();
+            const currency = String(formData.get("currency") ?? "UZS").trim().toUpperCase();
+            if (selectedProductIds.length === 0) {
+              setError("Выберите товары для прихода.");
               return;
             }
-            setOpen(false);
+            formData.set(
+              "items_json",
+              JSON.stringify(
+                selectedProductIds.map((productId) => ({
+                  productId,
+                  qty,
+                  cost,
+                  currency,
+                })),
+              ),
+            );
+            const res = await addStockReceiptAction(formData);
+            if (!res?.ok) {
+              setError("Проверьте поля (товары, количество, себестоимость).");
+              return;
+            }
+            setOpenReceipt(false);
             window.location.reload();
           }}
           className="space-y-3"
         >
           <div>
-            <label className="block text-xs font-medium text-zinc-600">Товар</label>
-            <select
-              name="product_id"
-              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
-              defaultValue={products[0]?.id ?? ""}
-            >
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.sku})
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center justify-between gap-2">
+              <label className="block text-xs font-medium text-zinc-600">
+                Товар{" "}
+                <span className="ml-2 rounded-full px-2 py-0.5 text-[11px] badge-brand">Выбрано: {selectedProductIds.length}</span>
+              </label>
+            </div>
+
+            <div className="mt-1 flex items-center gap-2">
+              <div className="flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200">
+                {selectedProductIds.length === 0 ? "Нажмите “+” и выберите товары" : `Выбрано товаров: ${selectedProductIds.length}`}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setOpenSelectProducts(true);
+                }}
+                className="h-[38px] w-[44px] rounded-xl border border-zinc-200 bg-white text-sm hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+                aria-label="Выбрать товары"
+                title="Выбрать товары"
+              >
+                +
+              </button>
+            </div>
           </div>
+
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Количество" name="qty" placeholder="Напр. 100" />
             <Field label="Себестоимость (за 1)" name="cost" placeholder="Напр. 12000" />
           </div>
+
           <div>
             <label className="block text-xs font-medium text-zinc-600">Валюта партии</label>
             <select
@@ -155,13 +192,25 @@ export default function StockBatches(props: { products: ProductOption[]; batches
             </select>
             <div className="mt-1 text-xs text-zinc-500">Для USD курс берётся из настроек.</div>
           </div>
+
           {error ? <div className="text-sm text-red-600">{error}</div> : null}
+
           <button type="submit" className="w-full rounded-xl px-3 py-2 text-sm font-medium btn-primary">
             Добавить
           </button>
         </form>
       </Modal>
+
+      <SelectProductsModal
+        open={openSelectProducts}
+        products={products}
+        selectedIds={selectedProductIds}
+        onClose={() => setOpenSelectProducts(false)}
+        onDone={(ids) => {
+          setSelectedProductIds(ids);
+          setOpenSelectProducts(false);
+        }}
+      />
     </div>
   );
 }
-

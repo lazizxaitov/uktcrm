@@ -29,7 +29,7 @@ export async function upsertProductAction(formData: FormData) {
         "UPDATE products SET name=?, sku=?, barcode=?, category=?, box_size=?, safety_stock=?, reorder_point=? WHERE id=?",
       )
       .run(name, sku, barcode, category, boxSizeVal, safetyStock, reorderPoint, id);
-    return { ok: true as const };
+    return { ok: true as const, product: { id, name, sku } };
   }
 
   const newId = nanoid();
@@ -38,6 +38,5 @@ export async function upsertProductAction(formData: FormData) {
       "INSERT INTO products (id, name, sku, barcode, category, box_size, safety_stock, reorder_point) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .run(newId, name, sku, barcode, category, boxSizeVal, safetyStock, reorderPoint);
-  return { ok: true as const };
+  return { ok: true as const, product: { id: newId, name, sku } };
 }
-
