@@ -20,7 +20,12 @@ export default function HeaderActions(props: {
   const [openNotifications, setOpenNotifications] = useState(false);
   const [openQuick, setOpenQuick] = useState(false);
   const [openAi, setOpenAi] = useState(false);
+  const [dark, setDark] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains("dark"));
+  }, []);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -48,6 +53,39 @@ export default function HeaderActions(props: {
 
   return (
     <div ref={rootRef} className="relative flex items-center gap-3">
+      <button
+        type="button"
+        onClick={() => {
+          const next = !document.documentElement.classList.contains("dark");
+          document.documentElement.classList.toggle("dark", next);
+          try {
+            localStorage.setItem("ukt_theme", next ? "dark" : "light");
+          } catch {}
+          setDark(next);
+        }}
+        className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-200 bg-white hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+        aria-label={dark ? "Светлая тема" : "Тёмная тема"}
+        title={dark ? "Светлая тема" : "Тёмная тема"}
+      >
+        {dark ? (
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 text-zinc-700 dark:text-zinc-200" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 1v2" />
+            <path d="M12 21v2" />
+            <path d="M4.22 4.22l1.42 1.42" />
+            <path d="M18.36 18.36l1.42 1.42" />
+            <path d="M1 12h2" />
+            <path d="M21 12h2" />
+            <path d="M4.22 19.78l1.42-1.42" />
+            <path d="M18.36 5.64l1.42-1.42" />
+            <circle cx="12" cy="12" r="4" />
+          </svg>
+        ) : (
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 text-zinc-700 dark:text-zinc-200" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+          </svg>
+        )}
+      </button>
+
       <div className="relative">
         <button
           type="button"
