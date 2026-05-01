@@ -26,6 +26,20 @@ function Card(props: { title: string; children: React.ReactNode }) {
   );
 }
 
+function fmtInt(n: number) {
+  const v = Number.isFinite(n) ? Math.round(n) : 0;
+  return v.toLocaleString("ru-RU");
+}
+
+function fmtMoneyUzs(n: number) {
+  return `${fmtInt(n)} UZS`;
+}
+
+function pct(cur: number, prev: number) {
+  if (!Number.isFinite(cur) || !Number.isFinite(prev) || prev === 0) return null;
+  return ((cur - prev) / prev) * 100;
+}
+
 export default function DashboardPage() {
   migrate();
   const database = db();
@@ -42,6 +56,88 @@ export default function DashboardPage() {
   const sumToday = database
     .prepare("SELECT COALESCE(SUM(CAST(total as REAL)),0) as sum FROM sales WHERE status='CLOSED' AND date(created_at)=date(?)")
     .get(bizYmd) as { sum: number };
+
+  const ymdYesterday = new Date(bizNow.getTime() - 86400000).toISOString().slice(0, 10);
+  const sumYesterday = database
+    .prepare("SELECT COALESCE(SUM(CAST(total as REAL)),0) as sum FROM sales WHERE status='CLOSED' AND date(created_at)=date(?)")
+    .get(ymdYesterday) as { sum: number };
+
+  const revenue7 = database
+    .prepare(
+      `
+      SELECT
+        COUNT(1) as checks,
+        COALESCE(SUM(CAST(total as REAL) * (CASE WHEN currency='USD' THEN COALESCE(CAST(fx_rate_used as REAL), ?) ELSE 1 END)),0) as revenue_uzs,
+        COALESCE(AVG(CAST(total as REAL) * (CASE WHEN currency='USD' THEN COALESCE(CAST(fx_rate_used as REAL), ?) ELSE 1 END)),0) as avg_check_uzs
+      FROM sales
+      WHERE status='CLOSED' AND closed_at IS NOT NULL AND datetime(closed_at) >= datetime(?, '-7 days')
+    `,
+    )
+    .get(fx, fx, bizNowIso) as { checks: number; revenue_uzs: number; avg_check_uzs: number };
+
+  const revenuePrev7 = database
+    .prepare(
+      `
+      SELECT
+        COALESCE(SUM(CAST(total as REAL) * (CASE WHEN currency='USD' THEN COALESCE(CAST(fx_rate_used as REAL), ?) ELSE 1 END)),0) as revenue_uzs
+      FROM sales
+      WHERE status='CLOSED' AND closed_at IS NOT NULL
+        AND datetime(closed_at) < datetime(?, '-7 days')
+        AND datetime(closed_at) >= datetime(?, '-14 days')
+    `,
+    )
+    .get(fx, bizNowIso, bizNowIso) as { revenue_uzs: number };
+
+  const revenue30 = database
+    .prepare(
+      `
+      SELECT
+        COUNT(1) as checks,
+        COALESCE(SUM(CAST(total as REAL) * (CASE WHEN currency='USD' THEN COALESCE(CAST(fx_rate_used as REAL), ?) ELSE 1 END)),0) as revenue_uzs
+      FROM sales
+      WHERE status='CLOSED' AND closed_at IS NOT NULL AND datetime(closed_at) >= datetime(?, '-30 days')
+    `,
+    )
+    .get(fx, bizNowIso) as { checks: number; revenue_uzs: number };
+
+  const cost30 = database
+    .prepare(
+      `
+      SELECT
+        COALESCE(SUM(CAST(a.qty as REAL) * CAST(a.cost as REAL) * (CASE WHEN a.currency='USD' THEN COALESCE(CAST(a.fx_rate as REAL), ?) ELSE 1 END)),0) as cost_uzs
+      FROM sale_allocations a
+      JOIN sale_items si ON si.id = a.sale_item_id
+      JOIN sales s ON s.id = si.sale_id
+      WHERE s.status='CLOSED' AND s.closed_at IS NOT NULL AND datetime(s.closed_at) >= datetime(?, '-30 days')
+    `,
+    )
+    .get(fx, bizNowIso) as { cost_uzs: number };
+
+  const profit30 = revenue30.revenue_uzs - cost30.cost_uzs;
+  const margin30 = revenue30.revenue_uzs > 0 ? (profit30 / revenue30.revenue_uzs) * 100 : 0;
+
+  const deposits = database.prepare("SELECT COALESCE(SUM(CAST(deposit_balance as REAL)),0) as sum FROM customers").get() as { sum: number };
+
+  const debt = database
+    .prepare(
+      `
+      WITH debt_sales AS (
+        SELECT s.id, s.customer_id, datetime(s.closed_at) as closed_at,
+               (CAST(s.total as REAL) - CAST(s.paid as REAL)) as debt_sale,
+               (CAST(s.total as REAL) - CAST(s.paid as REAL)) * (CASE WHEN s.currency='USD' THEN COALESCE(CAST(s.fx_rate_used as REAL), ?) ELSE 1 END) as debt_uzs
+        FROM sales s
+        WHERE s.status='CLOSED' AND s.customer_id IS NOT NULL AND s.closed_at IS NOT NULL
+      )
+      SELECT
+        COALESCE(SUM(CASE WHEN debt_sale > 0 THEN debt_uzs ELSE 0 END),0) as debt_uzs,
+        COALESCE(SUM(CASE
+          WHEN debt_sale > 0 AND c.debt_days IS NOT NULL AND datetime(ds.closed_at, '+' || c.debt_days || ' days') < datetime(?)
+          THEN debt_uzs ELSE 0 END),0) as overdue_uzs
+      FROM debt_sales ds
+      JOIN customers c ON c.id = ds.customer_id
+    `,
+    )
+    .get(fx, bizNowIso) as { debt_uzs: number; overdue_uzs: number };
 
   const soonOut = database
     .prepare(
@@ -117,6 +213,23 @@ export default function DashboardPage() {
   const avgDay30 = forecastRow30.revenue_uzs / 30;
   const forecast7 = avgDay30 * 7;
 
+  const topProducts7 = database
+    .prepare(
+      `
+      SELECT p.name, p.sku,
+             SUM(CAST(si.qty as REAL)) as qty,
+             SUM(CAST(si.total as REAL) * (CASE WHEN s.currency='USD' THEN COALESCE(CAST(s.fx_rate_used as REAL), ?) ELSE 1 END)) as revenue_uzs
+      FROM sale_items si
+      JOIN sales s ON s.id = si.sale_id
+      JOIN products p ON p.id = si.product_id
+      WHERE s.status='CLOSED' AND s.closed_at IS NOT NULL AND datetime(s.closed_at) >= datetime(?, '-7 days')
+      GROUP BY p.id
+      ORDER BY revenue_uzs DESC
+      LIMIT 5
+    `,
+    )
+    .all(fx, bizNowIso) as Array<{ name: string; sku: string; qty: number; revenue_uzs: number }>;
+
   return (
     <div className="space-y-6">
       <div>
@@ -129,6 +242,106 @@ export default function DashboardPage() {
         <Widget title="Клиенты" value={String(customers.cnt)} />
         <Widget title="Продажи сегодня" value={String(salesToday.cnt)} />
         <Widget title="Сумма (примерно)" value={sumToday.sum.toFixed(2)} hint="Сумма за сегодня." />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card title="Выручка">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-3">
+              <span>Сегодня</span>
+              <span className="font-medium">{fmtMoneyUzs(sumToday.sum)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span>Вчера</span>
+              <span className="font-medium">{fmtMoneyUzs(sumYesterday.sum)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span>7 дней</span>
+              <span className="font-medium">
+                {fmtMoneyUzs(revenue7.revenue_uzs)}
+                {pct(revenue7.revenue_uzs, revenuePrev7.revenue_uzs) !== null ? (
+                  <span className="ml-2 text-xs text-zinc-500">({pct(revenue7.revenue_uzs, revenuePrev7.revenue_uzs)!.toFixed(1)}%)</span>
+                ) : null}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span>30 дней</span>
+              <span className="font-medium">{fmtMoneyUzs(revenue30.revenue_uzs)}</span>
+            </div>
+          </div>
+        </Card>
+
+        <Card title="Прибыль (30 дней)">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-3">
+              <span>Выручка</span>
+              <span className="font-medium">{fmtMoneyUzs(revenue30.revenue_uzs)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span>Себестоимость</span>
+              <span className="font-medium">{fmtMoneyUzs(cost30.cost_uzs)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span>Прибыль</span>
+              <span className="font-medium">{fmtMoneyUzs(profit30)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span>Маржа</span>
+              <span className="font-medium">{margin30.toFixed(1)}%</span>
+            </div>
+          </div>
+        </Card>
+
+        <Card title="Чеки (7 дней)">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-3">
+              <span>Чеков</span>
+              <span className="font-medium">{fmtInt(revenue7.checks)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span>Средний чек</span>
+              <span className="font-medium">{fmtMoneyUzs(revenue7.avg_check_uzs)}</span>
+            </div>
+            <div className="text-xs text-zinc-500">USD конвертируется по курсу чека.</div>
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card title="Дебиторка и депозит">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-3">
+              <span>Долги клиентов</span>
+              <span className="font-medium">{fmtMoneyUzs(debt.debt_uzs)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span>Просрочено</span>
+              <span className="font-medium">{fmtMoneyUzs(debt.overdue_uzs)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span>Депозиты клиентов</span>
+              <span className="font-medium">{fmtMoneyUzs(deposits.sum)}</span>
+            </div>
+            <div className="text-xs text-zinc-500">Долг считается как (total − paid) по закрытым чекам.</div>
+          </div>
+        </Card>
+
+        <Card title="Топ товары (7 дней)">
+          {topProducts7.length === 0 ? (
+            <div className="text-zinc-500">Нет продаж за 7 дней</div>
+          ) : (
+            <ul className="space-y-1">
+              {topProducts7.map((r, i) => (
+                <li key={r.sku} className="flex items-center justify-between gap-3">
+                  <span className="truncate">
+                    {i + 1}. {r.name} <span className="text-xs text-zinc-400">({r.sku})</span>
+                  </span>
+                  <span className="text-xs text-zinc-500">{fmtMoneyUzs(r.revenue_uzs)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
