@@ -149,25 +149,9 @@ export default function AIAssistantModal(props: { open: boolean; onClose: () => 
                   "dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900/30",
                 ].join(" ")}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium text-zinc-800 dark:text-zinc-100">{p.label}</div>
-                    <div className="mt-0.5 truncate text-[11px] text-zinc-500">AI аналитика</div>
-                  </div>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-2xl border border-zinc-200 bg-white text-[var(--brand)] shadow-sm group-hover:bg-[var(--brand-soft)] dark:border-zinc-800 dark:bg-zinc-950">
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      className="h-4 w-4"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M9 18l6-6-6-6" />
-                    </svg>
-                  </div>
+                <div className="min-h-[52px]">
+                  <div className="font-medium text-zinc-800 dark:text-zinc-100 whitespace-normal leading-snug">{p.label}</div>
+                  <div className="mt-0.5 text-[11px] text-zinc-500">AI аналитика</div>
                 </div>
               </button>
             ))}
