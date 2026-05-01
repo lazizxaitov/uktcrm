@@ -10,6 +10,9 @@ export const metadata = {
   title: "UKT CRM",
 };
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   migrate();
   const user = await requireUser();

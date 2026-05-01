@@ -6,6 +6,9 @@ export const metadata = {
   title: "UKT CRM • Вход",
 };
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export default function LoginPage() {
   migrate();
   return (
