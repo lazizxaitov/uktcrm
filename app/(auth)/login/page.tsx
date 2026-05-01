@@ -15,7 +15,7 @@ export default function LoginPage() {
           <Image src="/ukt-logo.png" alt="UKT" width={110} height={24} style={{ height: "24px", width: "auto" }} priority />
         </div>
         <h1 className="mt-4 text-xl font-semibold">Вход</h1>
-        <p className="mt-1 text-sm text-zinc-500">Для теста: admin@local / admin</p>
+        <p className="mt-1 text-sm text-zinc-500">Для теста: adminukt / admin</p>
         <LoginForm />
       </div>
     </div>

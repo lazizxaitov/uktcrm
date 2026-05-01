@@ -195,15 +195,27 @@ export function migrate() {
   if (count.cnt === 0) {
     database
       .prepare("INSERT INTO users (id, name, email, role, password_hash) VALUES (?, ?, ?, ?, ?)")
-      .run("u_admin", "Admin", "admin@local", "Admin", sha256("admin"));
+      .run("u_admin", "Admin", "adminukt", "Admin", sha256("admin"));
     database
       .prepare("INSERT INTO notifications (id, type, message) VALUES (?, ?, ?)")
-      .run("n_welcome", "system", "Добро пожаловать в UKT CRM. Логин: admin@local, пароль: admin");
+      .run("n_welcome", "system", "Добро пожаловать в UKT CRM. Логин: adminukt, пароль: admin");
   }
 
   const metaCnt = database.prepare("SELECT COUNT(1) as cnt FROM meta").get() as { cnt: number };
   if (metaCnt.cnt === 0) {
     database.prepare("INSERT INTO meta (key, value) VALUES (?, ?)").run("fx_usd_uzs", "12500");
     database.prepare("INSERT INTO meta (key, value) VALUES (?, ?)").run("overpay_mode", "DEPOSIT"); // DEPOSIT | SELLER_MINUS
+  }
+
+  // upgrade: rename default admin login (admin@local -> adminukt)
+  try {
+    const hasOld = database.prepare("SELECT id FROM users WHERE email=?").get("admin@local") as { id: string } | undefined;
+    const hasNew = database.prepare("SELECT id FROM users WHERE email=?").get("adminukt") as { id: string } | undefined;
+    if (hasOld && !hasNew) {
+      database.prepare("UPDATE users SET email=? WHERE email=?").run("adminukt", "admin@local");
+      database.prepare("UPDATE notifications SET message=REPLACE(message, 'admin@local', 'adminukt') WHERE type='system'").run();
+    }
+  } catch {
+    // ignore
   }
 }
