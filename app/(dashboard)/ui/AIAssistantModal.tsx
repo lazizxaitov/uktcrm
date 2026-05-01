@@ -63,7 +63,7 @@ export default function AIAssistantModal(props: { open: boolean; onClose: () => 
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "assistant",
-      text: "Выберите готовый вопрос — я покажу аналитику по вашей базе.",
+      text: "Выберите вопрос, который вас интересует — я покажу аналитику.",
     },
   ]);
   const [loading, setLoading] = useState(false);
@@ -75,7 +75,7 @@ export default function AIAssistantModal(props: { open: boolean; onClose: () => 
     setMessages([
       {
         role: "assistant",
-        text: "Выберите готовый вопрос — я покажу аналитику по вашей базе.",
+        text: "Выберите вопрос, который вас интересует — я покажу аналитику.",
       },
     ]);
   }, [props.open]);
