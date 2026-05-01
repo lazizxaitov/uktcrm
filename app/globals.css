@@ -50,6 +50,14 @@ body {
 .btn-secondary:hover {
   background: rgb(244 244 245);
 }
+:root.dark .btn-secondary {
+  background: rgb(9 9 11);
+  border: 1px solid rgb(39 39 42);
+  color: rgb(244 244 245);
+}
+:root.dark .btn-secondary:hover {
+  background: rgb(24 24 27);
+}
 .badge-brand {
   background: var(--brand-soft);
   color: var(--brand);
