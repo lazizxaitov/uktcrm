@@ -4,6 +4,8 @@ import { db } from "@/lib/db/db";
 import { migrate } from "@/lib/db/migrate";
 import { requireUserForRoute } from "@/lib/auth/route";
 
+export const runtime = "nodejs";
+
 export async function GET(_: Request, ctx: { params: Promise<{ id: string }> }) {
   migrate();
   const user = await requireUserForRoute();

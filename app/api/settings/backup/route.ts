@@ -1,10 +1,12 @@
 import { requireUserForRoute } from "@/lib/auth/route";
 import { db } from "@/lib/db/db";
 import { migrate } from "@/lib/db/migrate";
+import { getDbFilePath } from "@/lib/db/paths";
 import fs from "node:fs/promises";
 import path from "node:path";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function ymdHm(d: Date) {
   const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -24,7 +26,7 @@ export async function GET() {
     // ignore
   }
 
-  const dir = path.join(process.cwd(), "data");
+  const dir = path.dirname(getDbFilePath());
   const fileName = `uktcrm-backup-${ymdHm(new Date())}.sqlite`;
   const tmpPath = path.join(dir, fileName);
   const safe = tmpPath.replaceAll("'", "''");
@@ -49,4 +51,3 @@ export async function GET() {
     return new Response("Не удалось создать резервную копию", { status: 500 });
   }
 }
-

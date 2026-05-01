@@ -4,6 +4,7 @@ import { getSettings } from "@/lib/settings/server";
 import { getBusinessNow } from "@/lib/time/server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 type ReqBody = { type?: string; text?: string };
 

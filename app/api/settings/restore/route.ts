@@ -1,10 +1,12 @@
 import { requireUserForRoute } from "@/lib/auth/route";
 import { closeDb } from "@/lib/db/db";
 import { migrate } from "@/lib/db/migrate";
+import { getDbFilePath } from "@/lib/db/paths";
 import fs from "node:fs/promises";
 import path from "node:path";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const user = await requireUserForRoute();
@@ -18,8 +20,8 @@ export async function POST(request: Request) {
   const buf = Buffer.from(await file.arrayBuffer());
   if (buf.length < 100) return new Response("Файл слишком маленький", { status: 400 });
 
-  const dataDir = path.join(process.cwd(), "data");
-  const dbPath = path.join(dataDir, "uktcrm.sqlite");
+  const dbPath = getDbFilePath();
+  const dataDir = path.dirname(dbPath);
   const walPath = `${dbPath}-wal`;
   const shmPath = `${dbPath}-shm`;
   const tmpPath = path.join(dataDir, `restore-${Date.now()}.sqlite`);
@@ -47,4 +49,3 @@ export async function POST(request: Request) {
     return new Response("Не удалось восстановить базу", { status: 500 });
   }
 }
-
