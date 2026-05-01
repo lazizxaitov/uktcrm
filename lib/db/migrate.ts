@@ -13,6 +13,11 @@ export function migrate() {
     return rows.some((r) => r.name === column);
   };
 
+  const hasTable = (table: string) => {
+    const row = database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table) as { name?: string } | undefined;
+    return !!row?.name;
+  };
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS meta (
       key TEXT PRIMARY KEY,
@@ -62,6 +67,7 @@ export function migrate() {
       sku TEXT NOT NULL UNIQUE,
       barcode TEXT,
       category TEXT,
+      category_id TEXT,
       box_size INTEGER,
       safety_stock TEXT NOT NULL DEFAULT '0',
       reorder_point TEXT NOT NULL DEFAULT '0',
@@ -150,6 +156,38 @@ export function migrate() {
   }
   if (!hasColumn("sales", "fx_rate_used")) {
     database.exec("ALTER TABLE sales ADD COLUMN fx_rate_used TEXT");
+  }
+  if (!hasColumn("products", "category_id")) {
+    database.exec("ALTER TABLE products ADD COLUMN category_id TEXT");
+  }
+
+  if (!hasTable("categories")) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+  }
+
+  // Backfill categories from legacy products.category
+  try {
+    const cats = database
+      .prepare("SELECT DISTINCT TRIM(category) as name FROM products WHERE category IS NOT NULL AND TRIM(category) <> ''")
+      .all() as Array<{ name: string }>;
+    for (const c of cats) {
+      const name = c.name.trim();
+      if (!name) continue;
+      const existing = database.prepare("SELECT id FROM categories WHERE LOWER(name)=LOWER(?)").get(name) as { id: string } | undefined;
+      const id = existing?.id ?? `cat_${crypto.randomUUID()}`;
+      if (!existing) {
+        database.prepare("INSERT INTO categories (id, name) VALUES (?, ?)").run(id, name);
+      }
+      database.prepare("UPDATE products SET category_id=? WHERE category_id IS NULL AND TRIM(category)=?").run(id, name);
+    }
+  } catch {
+    // ignore
   }
 
   // seed admin

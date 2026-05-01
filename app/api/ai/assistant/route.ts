@@ -1,6 +1,7 @@
 import { requireUserForRoute } from "@/lib/auth/route";
 import { db } from "@/lib/db/db";
 import { getSettings } from "@/lib/settings/server";
+import { getBusinessNow } from "@/lib/time/server";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,15 @@ export async function POST(request: Request) {
   const database = db();
   const settings = getSettings();
   const fx = n2(settings.fxUsdUzs) || 12500;
+  const bizNow = getBusinessNow();
+  const nowIso = bizNow.toISOString();
+  const from30Iso = new Date(bizNow.getTime() - 30 * 86400000).toISOString();
+  const from60Iso = new Date(bizNow.getTime() - 60 * 86400000).toISOString();
+  const from7Iso = new Date(bizNow.getTime() - 7 * 86400000).toISOString();
+  const from14Iso = new Date(bizNow.getTime() - 14 * 86400000).toISOString();
+  const startOfDay = new Date(bizNow);
+  startOfDay.setHours(0, 0, 0, 0);
+  const fromTodayIso = startOfDay.toISOString();
 
   try {
     if (type === "help") {
@@ -123,7 +133,7 @@ export async function POST(request: Request) {
                    SUM(CAST(si.qty as REAL)) as sold30
             FROM sale_items si
             JOIN sales s ON s.id = si.sale_id
-            WHERE s.status='CLOSED' AND datetime(s.closed_at) >= datetime('now','-30 days')
+            WHERE s.status='CLOSED' AND s.closed_at IS NOT NULL AND datetime(s.closed_at) >= datetime(?)
             GROUP BY si.product_id
           ),
           onhand AS (
@@ -143,7 +153,7 @@ export async function POST(request: Request) {
           LIMIT 12
         `,
         )
-        .all() as Array<{ name: string; sku: string; onhand: number; sold30: number }>;
+        .all(from30Iso) as Array<{ name: string; sku: string; onhand: number; sold30: number }>;
 
       const enriched = rows
         .map((r) => {
@@ -179,7 +189,7 @@ export async function POST(request: Request) {
                    SUM(CAST(si.qty as REAL)) as sold30
             FROM sale_items si
             JOIN sales s ON s.id = si.sale_id
-            WHERE s.status='CLOSED' AND datetime(s.closed_at) >= datetime('now','-30 days')
+            WHERE s.status='CLOSED' AND s.closed_at IS NOT NULL AND datetime(s.closed_at) >= datetime(?)
             GROUP BY si.product_id
           ),
           onhand AS (
@@ -199,7 +209,7 @@ export async function POST(request: Request) {
           LIMIT 15
         `,
         )
-        .all() as Array<{ name: string; sku: string; onhand: number; sold30: number }>;
+        .all(from30Iso) as Array<{ name: string; sku: string; onhand: number; sold30: number }>;
 
       if (rows.length === 0) {
         return Response.json({ ok: true, title: "Какие товары медленно продаются", text: "Нет данных по складу." });
@@ -232,13 +242,13 @@ export async function POST(request: Request) {
           cur AS (
             SELECT customer_id, SUM(total_uzs) as cur_uzs
             FROM s_norm
-            WHERE datetime(closed_at) >= datetime('now','-30 days')
+            WHERE datetime(closed_at) >= datetime(?)
             GROUP BY customer_id
           ),
           prev AS (
             SELECT customer_id, SUM(total_uzs) as prev_uzs
             FROM s_norm
-            WHERE datetime(closed_at) < datetime('now','-30 days') AND datetime(closed_at) >= datetime('now','-60 days')
+            WHERE datetime(closed_at) < datetime(?) AND datetime(closed_at) >= datetime(?)
             GROUP BY customer_id
           )
           SELECT c.name as name,
@@ -252,7 +262,7 @@ export async function POST(request: Request) {
           LIMIT 10
         `,
         )
-        .all(fx) as Array<{ name: string; cur_uzs: number; prev_uzs: number }>;
+        .all(fx, from30Iso, from30Iso, from60Iso) as Array<{ name: string; cur_uzs: number; prev_uzs: number }>;
 
       if (rows.length === 0) {
         return Response.json({
@@ -283,10 +293,10 @@ export async function POST(request: Request) {
             COUNT(1) as checks,
             SUM(CAST(total as REAL) * (CASE WHEN currency='USD' THEN COALESCE(CAST(fx_rate_used as REAL), ?) ELSE 1 END)) as revenue_uzs
           FROM sales
-          WHERE status='CLOSED' AND datetime(closed_at) >= datetime('now','-30 days')
+          WHERE status='CLOSED' AND closed_at IS NOT NULL AND datetime(closed_at) >= datetime(?)
         `,
         )
-        .get(fx) as { checks: number; revenue_uzs: number | null };
+        .get(fx, from30Iso) as { checks: number; revenue_uzs: number | null };
       const row7 = database
         .prepare(
           `
@@ -294,10 +304,10 @@ export async function POST(request: Request) {
             COUNT(1) as checks,
             SUM(CAST(total as REAL) * (CASE WHEN currency='USD' THEN COALESCE(CAST(fx_rate_used as REAL), ?) ELSE 1 END)) as revenue_uzs
           FROM sales
-          WHERE status='CLOSED' AND datetime(closed_at) >= datetime('now','-7 days')
+          WHERE status='CLOSED' AND closed_at IS NOT NULL AND datetime(closed_at) >= datetime(?)
         `,
         )
-        .get(fx) as { checks: number; revenue_uzs: number | null };
+        .get(fx, from7Iso) as { checks: number; revenue_uzs: number | null };
       const rowPrev7 = database
         .prepare(
           `
@@ -305,10 +315,10 @@ export async function POST(request: Request) {
             COUNT(1) as checks,
             SUM(CAST(total as REAL) * (CASE WHEN currency='USD' THEN COALESCE(CAST(fx_rate_used as REAL), ?) ELSE 1 END)) as revenue_uzs
           FROM sales
-          WHERE status='CLOSED' AND datetime(closed_at) < datetime('now','-7 days') AND datetime(closed_at) >= datetime('now','-14 days')
+          WHERE status='CLOSED' AND closed_at IS NOT NULL AND datetime(closed_at) < datetime(?) AND datetime(closed_at) >= datetime(?)
         `,
         )
-        .get(fx) as { checks: number; revenue_uzs: number | null };
+        .get(fx, from7Iso, from14Iso) as { checks: number; revenue_uzs: number | null };
 
       const rev30 = n2(row30.revenue_uzs);
       const rev7 = n2(row7.revenue_uzs);
@@ -344,13 +354,13 @@ export async function POST(request: Request) {
           FROM sale_items si
           JOIN sales s ON s.id = si.sale_id
           JOIN products p ON p.id = si.product_id
-          WHERE s.status='CLOSED' AND datetime(s.closed_at) >= datetime('now','-30 days')
+          WHERE s.status='CLOSED' AND s.closed_at IS NOT NULL AND datetime(s.closed_at) >= datetime(?)
           GROUP BY p.id
           ORDER BY revenue_uzs DESC
           LIMIT 10
         `,
         )
-        .all(fx) as Array<{ name: string; sku: string; qty: number; revenue_uzs: number }>;
+        .all(fx, from30Iso) as Array<{ name: string; sku: string; qty: number; revenue_uzs: number }>;
 
       if (rows.length === 0) {
         return Response.json({ ok: true, title: "Топ товары (30 дней)", text: "Нет продаж за последние 30 дней." });
@@ -364,11 +374,11 @@ export async function POST(request: Request) {
 
     const range =
       type === "sales_today"
-        ? { title: "Продажи сегодня", fromSql: "datetime(date('now'))" }
+        ? { title: "Продажи сегодня", fromIso: fromTodayIso }
         : type === "sales_7d"
-          ? { title: "Продажи за 7 дней", fromSql: "datetime('now','-7 days')" }
-        : type === "sales_30d" || type === "profit_30d"
-            ? { title: type === "profit_30d" ? "Прибыль за 30 дней" : "Продажи за 30 дней", fromSql: "datetime('now','-30 days')" }
+          ? { title: "Продажи за 7 дней", fromIso: from7Iso }
+          : type === "sales_30d" || type === "profit_30d"
+            ? { title: type === "profit_30d" ? "Прибыль за 30 дней" : "Продажи за 30 дней", fromIso: from30Iso }
             : null;
 
     if (!range) return Response.json({ ok: true, title: "AI ассистент", text: "Не понял запрос. Выберите готовый вопрос." });
@@ -381,10 +391,10 @@ export async function POST(request: Request) {
           SUM(CAST(total as REAL) * (CASE WHEN currency='USD' THEN COALESCE(CAST(fx_rate_used as REAL), ?) ELSE 1 END)) as revenue_uzs,
           AVG(CAST(total as REAL) * (CASE WHEN currency='USD' THEN COALESCE(CAST(fx_rate_used as REAL), ?) ELSE 1 END)) as avg_check_uzs
         FROM sales
-        WHERE status='CLOSED' AND datetime(closed_at) >= ${range.fromSql}
+        WHERE status='CLOSED' AND closed_at IS NOT NULL AND datetime(closed_at) >= datetime(?)
       `,
       )
-      .get(fx, fx) as { checks: number; revenue_uzs: number | null; avg_check_uzs: number | null };
+      .get(fx, fx, range.fromIso) as { checks: number; revenue_uzs: number | null; avg_check_uzs: number | null };
 
     const revenueUzs = n2(revenueRow.revenue_uzs);
     const avgUzs = n2(revenueRow.avg_check_uzs);
@@ -398,10 +408,10 @@ export async function POST(request: Request) {
           FROM sale_allocations a
           JOIN sale_items si ON si.id = a.sale_item_id
           JOIN sales s ON s.id = si.sale_id
-          WHERE s.status='CLOSED' AND datetime(s.closed_at) >= ${range.fromSql}
+          WHERE s.status='CLOSED' AND s.closed_at IS NOT NULL AND datetime(s.closed_at) >= datetime(?)
         `,
         )
-        .get(fx) as { cost_uzs: number | null };
+        .get(fx, range.fromIso) as { cost_uzs: number | null };
 
       const costUzs = n2(costRow.cost_uzs);
       const profit = revenueUzs - costUzs;

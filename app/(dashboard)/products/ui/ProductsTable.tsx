@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { deleteProductAction, upsertProductAction } from "@/app/(dashboard)/products/actions";
+import {
+  createCategoryAction,
+  deleteCategoryAction,
+  deleteProductAction,
+  renameCategoryAction,
+  upsertProductAction,
+} from "@/app/(dashboard)/products/actions";
 import { useConfirmDialog } from "@/app/components/useConfirmDialog";
 
 type ProductRow = {
@@ -9,7 +15,8 @@ type ProductRow = {
   name: string;
   sku: string;
   barcode: string | null;
-  category: string | null;
+  category_id: string | null;
+  category_name: string | null;
   box_size: number | null;
   safety_stock: string;
   reorder_point: string;
@@ -56,13 +63,13 @@ function Modal(props: { open: boolean; title: string; onClose: () => void; child
   );
 }
 
-export default function ProductsTable(props: { rows: ProductRow[] }) {
+export default function ProductsTable(props: { rows: ProductRow[]; categories: Array<{ id: string; name: string }> }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ProductRow | null>(null);
   const [openCategories, setOpenCategories] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [extraCategories, setExtraCategories] = useState<string[]>([]);
-  const [newCategory, setNewCategory] = useState("");
+  const [categoryFilterId, setCategoryFilterId] = useState<string | null>(null);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ProductRow | null>(null);
   const [dirtyProduct, setDirtyProduct] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,23 +77,14 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
 
   const { confirm, dialog } = useConfirmDialog();
 
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    for (const r of rows) {
-      const c = (r.category ?? "").trim();
-      if (c) set.add(c);
-    }
-    for (const c of extraCategories) {
-      const v = c.trim();
-      if (v) set.add(v);
-    }
-    return Array.from(set).sort((a, b) => a.localeCompare(b, "ru"));
-  }, [rows, extraCategories]);
+  const categories = useMemo(() => props.categories, [props.categories]);
+  const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
+  const filterLabel = categoryFilterId ? categoryById.get(categoryFilterId) ?? "Категория" : null;
 
   const filteredRows = useMemo(() => {
-    if (!categoryFilter) return rows;
-    return rows.filter((r) => (r.category ?? "").trim() === categoryFilter);
-  }, [rows, categoryFilter]);
+    if (!categoryFilterId) return rows;
+    return rows.filter((r) => r.category_id === categoryFilterId);
+  }, [rows, categoryFilterId]);
 
   const startCreate = () => {
     setError(null);
@@ -118,14 +116,14 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
           <div className="text-sm font-semibold">Список товаров</div>
-          {categoryFilter ? (
+          {categoryFilterId && filterLabel ? (
             <button
               type="button"
-              onClick={() => setCategoryFilter(null)}
+              onClick={() => setCategoryFilterId(null)}
               className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:bg-zinc-900"
               title="Сбросить фильтр"
             >
-              Категория: {categoryFilter} <span className="text-zinc-400">×</span>
+              Категория: {filterLabel} <span className="text-zinc-400">×</span>
             </button>
           ) : null}
         </div>
@@ -133,7 +131,8 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
           <button
             type="button"
             onClick={() => {
-              setNewCategory("");
+              setNewCategoryName("");
+              setEditCategoryId(null);
               setOpenCategories(true);
             }}
             className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
@@ -170,7 +169,7 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
                 <tr key={r.id} className="border-t border-zinc-100 dark:border-zinc-900">
                   <td className="px-4 py-3">{r.name}</td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">{r.sku}</td>
-                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">{r.category ?? "—"}</td>
+                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">{r.category_name ?? "—"}</td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">{r.safety_stock}</td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">{r.reorder_point}</td>
                   <td className="px-4 py-3 text-right">
@@ -235,7 +234,34 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
           <Field label="Название" name="name" defaultValue={editing?.name ?? ""} />
           <Field label="SKU" name="sku" defaultValue={editing?.sku ?? ""} />
           <Field label="Штрихкод" name="barcode" defaultValue={editing?.barcode ?? ""} placeholder="Необязательно" />
-          <Field label="Категория" name="category" defaultValue={editing?.category ?? ""} placeholder="Необязательно" />
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <label className="block text-xs font-medium text-zinc-600">Категория</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setNewCategoryName("");
+                  setEditCategoryId(null);
+                  setOpenCategories(true);
+                }}
+                className="rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+              >
+                Управлять
+              </button>
+            </div>
+            <select
+              name="category_id"
+              defaultValue={editing?.category_id ?? ""}
+              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
+            >
+              <option value="">—</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <Field label="Коробка (X шт)" name="box_size" defaultValue={editing?.box_size?.toString() ?? ""} type="number" placeholder="Напр. 12" />
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Safety stock" name="safety_stock" defaultValue={editing?.safety_stock ?? "0"} />
@@ -289,13 +315,13 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
         open={openCategories}
         title="Категории"
         onClose={() => {
-          if (!newCategory.trim()) {
+          if (!newCategoryName.trim()) {
             setOpenCategories(false);
             return;
           }
           confirm(() => setOpenCategories(false), {
             title: "Несохранённые данные",
-            message: "Вы начали вводить новую категорию. Закрыть без сохранения?",
+            message: "Вы начали вводить категорию. Закрыть без сохранения?",
             confirmText: "Закрыть",
             cancelText: "Не закрывать",
           });
@@ -304,10 +330,10 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
         <div className="space-y-4">
           <div className="grid gap-2 md:grid-cols-[1fr_auto]">
             <div>
-              <label className="block text-xs font-medium text-zinc-600">Новая категория</label>
+              <label className="block text-xs font-medium text-zinc-600">{editCategoryId ? "Переименовать категорию" : "Новая категория"}</label>
               <input
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
                 placeholder="Напр. Напитки"
                 className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
               />
@@ -315,18 +341,36 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
             <button
               type="button"
               onClick={() => {
-                const v = newCategory.trim();
+                const v = newCategoryName.trim();
                 if (!v) return;
-                const exists =
-                  categories.some((c) => c.toLowerCase() === v.toLowerCase()) ||
-                  extraCategories.some((c) => c.toLowerCase() === v.toLowerCase());
-                if (!exists) setExtraCategories((prev) => [...prev, v]);
-                setCategoryFilter(v);
-                setOpenCategories(false);
+                if (editCategoryId) {
+                  const fd = new FormData();
+                  fd.set("id", editCategoryId);
+                  fd.set("name", v);
+                  renameCategoryAction(fd).then((res) => {
+                    if (!res?.ok) {
+                      setError("Не удалось переименовать.");
+                      return;
+                    }
+                    setOpenCategories(false);
+                    window.location.reload();
+                  });
+                  return;
+                }
+                const fd = new FormData();
+                fd.set("name", v);
+                createCategoryAction(fd).then((res) => {
+                  if (!res?.ok) {
+                    setError("Не удалось создать категорию.");
+                    return;
+                  }
+                  setOpenCategories(false);
+                  window.location.reload();
+                });
               }}
               className="mt-5 rounded-xl px-4 py-2 text-sm btn-primary"
             >
-              Создать
+              {editCategoryId ? "Сохранить" : "Создать"}
             </button>
           </div>
 
@@ -334,33 +378,74 @@ export default function ProductsTable(props: { rows: ProductRow[] }) {
             <button
               type="button"
               onClick={() => {
-                setCategoryFilter(null);
+                setCategoryFilterId(null);
                 setOpenCategories(false);
               }}
               className="flex w-full items-center justify-between px-4 py-3 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
             >
               <span className="font-medium">Все категории</span>
-              {!categoryFilter ? <span className="text-xs text-[var(--brand)]">Выбрано</span> : null}
+              {!categoryFilterId ? <span className="text-xs text-[var(--brand)]">Выбрано</span> : null}
             </button>
             <div className="border-t border-zinc-200 dark:border-zinc-800" />
             <div className="max-h-[45vh] overflow-auto">
               {categories.length === 0 ? (
                 <div className="px-4 py-6 text-sm text-zinc-500">Пока нет категорий.</div>
               ) : (
-                categories.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => {
-                      setCategoryFilter(c);
-                      setOpenCategories(false);
-                    }}
-                    className="flex w-full items-center justify-between px-4 py-3 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
-                  >
-                    <span className="truncate">{c}</span>
-                    {categoryFilter === c ? <span className="text-xs text-[var(--brand)]">Выбрано</span> : null}
-                  </button>
-                ))
+                categories.map((c) => {
+                  const isSelected = categoryFilterId === c.id;
+                  return (
+                    <div key={c.id} className="flex items-center justify-between gap-2 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900/30">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCategoryFilterId(c.id);
+                          setOpenCategories(false);
+                        }}
+                        className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left text-sm"
+                      >
+                        <span className="truncate">{c.name}</span>
+                        {isSelected ? <span className="shrink-0 text-xs text-[var(--brand)]">Выбрано</span> : null}
+                      </button>
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setError(null);
+                            setEditCategoryId(c.id);
+                            setNewCategoryName(c.name);
+                          }}
+                          className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+                        >
+                          Изменить
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            confirm(() => {
+                              const fd = new FormData();
+                              fd.set("id", c.id);
+                              deleteCategoryAction(fd).then((res) => {
+                                if (!res?.ok) {
+                                  setError((res as any)?.reason ?? "Не удалось удалить.");
+                                  return;
+                                }
+                                window.location.reload();
+                              });
+                            }, {
+                              title: "Удалить категорию",
+                              message: `Удалить категорию «${c.name}»?`,
+                              confirmText: "Удалить",
+                              cancelText: "Отмена",
+                            });
+                          }}
+                          className="rounded-lg border border-red-200 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50 dark:border-red-900/40 dark:bg-zinc-950 dark:text-red-300 dark:hover:bg-red-950/30"
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
