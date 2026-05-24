@@ -345,7 +345,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="AI: Скоро закончатся (Safety stock)">
+        <Card title="AI: Скоро закончатся (минимум)">
           {soonOut.length === 0 ? (
             <div className="text-zinc-500">Нет рисков</div>
           ) : (
@@ -363,7 +363,7 @@ export default function DashboardPage() {
             </ul>
           )}
         </Card>
-        <Card title="AI: Подсказка по заказу (Reorder point)">
+        <Card title="AI: Подсказка по заказу (точка заказа)">
           {reorderHint.length === 0 ? (
             <div className="text-zinc-500">Всё в норме</div>
           ) : (

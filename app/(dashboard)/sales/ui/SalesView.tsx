@@ -152,7 +152,7 @@ export default function SalesView(props: {
           ) : (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="rounded-full px-2 py-1 text-xs badge-brand">OPEN</span>
+                <span className="rounded-full px-2 py-1 text-xs badge-brand">ОТКРЫТ</span>
                 <span className="text-zinc-600">Валюта: {openSale.currency}</span>
                 <span className="text-zinc-600">Клиент: {openSale.customer_name ?? "—"}</span>
                 <span className="text-zinc-500">#{openSale.id}</span>
@@ -261,7 +261,7 @@ export default function SalesView(props: {
                             href={`/api/sales/${s.id}/receipt.pdf`}
                             target="_blank"
                           >
-                            PDF
+                            Чек (PDF)
                           </Link>
                           <button
                             type="button"

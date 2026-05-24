@@ -195,7 +195,7 @@ export function migrate() {
   if (count.cnt === 0) {
     database
       .prepare("INSERT INTO users (id, name, email, role, password_hash) VALUES (?, ?, ?, ?, ?)")
-      .run("u_admin", "Admin", "adminukt", "Admin", sha256("admin"));
+      .run("u_admin", "Админ", "adminukt", "Admin", sha256("admin"));
     database
       .prepare("INSERT INTO notifications (id, type, message) VALUES (?, ?, ?)")
       .run("n_welcome", "system", "Добро пожаловать в UKT CRM. Логин: adminukt, пароль: admin");

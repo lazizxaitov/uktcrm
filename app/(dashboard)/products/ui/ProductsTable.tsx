@@ -264,8 +264,8 @@ export default function ProductsTable(props: { rows: ProductRow[]; categories: A
           </div>
           <Field label="Коробка (X шт)" name="box_size" defaultValue={editing?.box_size?.toString() ?? ""} type="number" placeholder="Напр. 12" />
           <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Safety stock" name="safety_stock" defaultValue={editing?.safety_stock ?? "0"} />
-            <Field label="Reorder point" name="reorder_point" defaultValue={editing?.reorder_point ?? "0"} />
+            <Field label="Safety stock (минимум)" name="safety_stock" defaultValue={editing?.safety_stock ?? "0"} />
+            <Field label="Точка заказа (reorder)" name="reorder_point" defaultValue={editing?.reorder_point ?? "0"} />
           </div>
           {error ? <div className="text-sm text-red-600">{error}</div> : null}
           <button type="submit" className="w-full rounded-xl px-3 py-2 text-sm font-medium btn-primary">
