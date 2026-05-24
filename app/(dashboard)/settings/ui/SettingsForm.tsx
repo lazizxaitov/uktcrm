@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import DateField from "@/app/components/DateField";
+import SelectField from "@/app/components/SelectField";
 import { resetBusinessTimeAction, updateBusinessTimeAction, updateSettingsAction } from "@/app/(dashboard)/settings/actions";
 
 function formatDateTimeRu(iso: string) {
@@ -61,15 +62,16 @@ export default function SettingsForm(props: {
               <div className="mt-1 text-xs text-zinc-500">Используется для партий в USD и расчёта прибыли.</div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-600">Переплата</label>
-              <select
+              <SelectField
                 name="overpay_mode"
+                label="Переплата"
                 defaultValue={props.settings.overpayMode}
-                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
-              >
-                <option value="DEPOSIT">В депозит клиента</option>
-                <option value="SELLER_MINUS">Минус продавцу</option>
-              </select>
+                options={[
+                  { value: "DEPOSIT", label: "В депозит клиента" },
+                  { value: "SELLER_MINUS", label: "Минус продавцу" },
+                ]}
+                searchable={false}
+              />
               <div className="mt-1 text-xs text-zinc-500">Логика для ситуации: чек 700$, оплата 750$.</div>
             </div>
           </div>

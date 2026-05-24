@@ -9,6 +9,7 @@ import {
   upsertProductAction,
 } from "@/app/(dashboard)/products/actions";
 import { useConfirmDialog } from "@/app/components/useConfirmDialog";
+import SelectField from "@/app/components/SelectField";
 
 type ProductRow = {
   id: string;
@@ -249,18 +250,13 @@ export default function ProductsTable(props: { rows: ProductRow[]; categories: A
                 Управлять
               </button>
             </div>
-            <select
+            <SelectField
               name="category_id"
               defaultValue={editing?.category_id ?? ""}
-              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
-            >
-              <option value="">—</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              placeholder="—"
+              options={[{ value: "", label: "—" }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
+              searchable
+            />
           </div>
           <Field label="Коробка (X шт)" name="box_size" defaultValue={editing?.box_size?.toString() ?? ""} type="number" placeholder="Напр. 12" />
           <div className="grid gap-3 md:grid-cols-2">

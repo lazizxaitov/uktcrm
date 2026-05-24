@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { addStockReceiptAction } from "@/app/(dashboard)/stock/actions";
 import SelectProductsModal from "@/app/(dashboard)/stock/ui/SelectProductsModal";
 import { useConfirmDialog } from "@/app/components/useConfirmDialog";
+import SelectField from "@/app/components/SelectField";
 
 type ProductOption = { id: string; name: string; sku: string };
 type BatchRow = {
@@ -220,15 +221,16 @@ export default function StockBatches(props: { products: ProductOption[]; batches
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-zinc-600">Валюта партии</label>
-            <select
+            <SelectField
               name="currency"
-              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
+              label="Валюта партии"
               defaultValue="UZS"
-            >
-              <option value="UZS">UZS</option>
-              <option value="USD">USD</option>
-            </select>
+              options={[
+                { value: "UZS", label: "UZS" },
+                { value: "USD", label: "USD" },
+              ]}
+              searchable={false}
+            />
             <div className="mt-1 text-xs text-zinc-500">Для USD курс берётся из настроек.</div>
           </div>
 

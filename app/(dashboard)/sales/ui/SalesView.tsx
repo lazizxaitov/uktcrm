@@ -6,6 +6,7 @@ import { closeSaleAction, createSaleWithItemsAction, deleteOpenSaleAction, refun
 import { useConfirmDialog } from "@/app/components/useConfirmDialog";
 import SaleItemsPickerModal, { type DraftSaleItem } from "@/app/(dashboard)/sales/ui/SaleItemsPickerModal";
 import DateField from "@/app/components/DateField";
+import SelectField from "@/app/components/SelectField";
 
 type CustomerOption = { id: string; name: string };
 type ProductOption = { id: string; name: string; sku: string };
@@ -335,30 +336,26 @@ export default function SalesView(props: {
         >
           <div className="grid gap-3 md:grid-cols-2">
             <div>
-              <label className="block text-xs font-medium text-zinc-600">Клиент (необязательно)</label>
-              <select
+              <SelectField
                 name="customer_id"
+                label="Клиент (необязательно)"
                 defaultValue=""
-                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
-              >
-                <option value="">—</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="—"
+                options={[{ value: "", label: "—" }, ...customers.map((c) => ({ value: c.id, label: c.name }))]}
+                searchable
+              />
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-600">Валюта</label>
-              <select
+              <SelectField
                 name="currency"
+                label="Валюта"
                 defaultValue="UZS"
-                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
-              >
-                <option value="UZS">UZS</option>
-                <option value="USD">USD</option>
-              </select>
+                options={[
+                  { value: "UZS", label: "UZS" },
+                  { value: "USD", label: "USD" },
+                ]}
+                searchable={false}
+              />
             </div>
           </div>
 
