@@ -3,6 +3,43 @@ import { migrate } from "@/lib/db/migrate";
 
 export const metadata = { title: "Аудит • UKT CRM" };
 
+const ACTION_RU: Record<string, string> = {
+  CREATE: "Создание",
+  UPDATE: "Изменение",
+  DELETE: "Удаление",
+  CLOSE: "Закрытие",
+  REFUND: "Возврат",
+};
+
+const ENTITY_RU: Record<string, string> = {
+  sale: "Чек",
+  sale_item: "Позиция чека",
+  stock_batch: "Партия склада",
+  stock_receipt: "Приход",
+  product: "Товар",
+  customer: "Клиент",
+  category: "Категория",
+  settings: "Настройки",
+  business_time: "Время в CRM",
+};
+
+function formatPayload(payload: string | null) {
+  if (!payload) return "—";
+  try {
+    const obj = JSON.parse(payload) as any;
+    if (obj && typeof obj === "object") {
+      if (typeof obj.reason === "string") {
+        const map: Record<string, string> = { empty_open_sale: "пустой открытый чек", empty_open_sale_item: "пустая позиция", empty_open_sale_receipt: "пустой приход" };
+        if (map[obj.reason]) obj.reason = map[obj.reason];
+      }
+    }
+    const s = JSON.stringify(obj);
+    return s.length > 160 ? s.slice(0, 160) : s;
+  } catch {
+    return payload.length > 160 ? payload.slice(0, 160) : payload;
+  }
+}
+
 export default function AuditPage() {
   migrate();
   const database = db();
@@ -61,13 +98,13 @@ export default function AuditPage() {
                       <div className="font-medium">{r.user_name}</div>
                       <div className="text-xs text-zinc-500">{r.user_role}</div>
                     </td>
-                    <td className="px-4 py-3">{r.action}</td>
+                    <td className="px-4 py-3">{ACTION_RU[r.action] ?? r.action}</td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">
-                      {r.entity}
+                      {ENTITY_RU[r.entity] ?? r.entity}
                       {r.entity_id ? <span className="text-xs text-zinc-400"> • {r.entity_id}</span> : null}
                     </td>
                     <td className="px-4 py-3 text-xs text-zinc-600 dark:text-zinc-300">
-                      {r.payload ? r.payload.slice(0, 160) : "—"}
+                      {formatPayload(r.payload)}
                     </td>
                   </tr>
                 ))
