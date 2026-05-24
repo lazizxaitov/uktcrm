@@ -24,6 +24,69 @@ export async function openSaleAction(formData: FormData) {
   return { ok: true as const, id };
 }
 
+type CreateSaleItem = { productId: string; qty: string; price: string };
+
+export async function createSaleWithItemsAction(formData: FormData) {
+  const user = await requireUser();
+  const database = db();
+
+  const customerId = str(formData, "customer_id") || null;
+  const currency = (str(formData, "currency") || "UZS").toUpperCase();
+  if (currency !== "UZS" && currency !== "USD") return { ok: false as const };
+
+  const createdAtRaw = str(formData, "created_at") || null;
+  const createdAt = createdAtRaw && !Number.isNaN(Date.parse(createdAtRaw)) ? new Date(createdAtRaw).toISOString() : null;
+
+  const json = str(formData, "items_json");
+  if (!json) return { ok: false as const };
+  let items: CreateSaleItem[] = [];
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    if (!Array.isArray(parsed)) return { ok: false as const };
+    items = (parsed as any[])
+      .map((x) => ({
+        productId: String(x?.productId ?? "").trim(),
+        qty: String(x?.qty ?? "").trim(),
+        price: String(x?.price ?? "").trim(),
+      }))
+      .filter((x) => x.productId && x.qty && x.price);
+  } catch {
+    return { ok: false as const };
+  }
+  if (items.length === 0) return { ok: false as const };
+
+  const id = nanoid();
+  const tx = database.transaction(() => {
+    if (createdAt) database.prepare("INSERT INTO sales (id, customer_id, status, currency, created_at) VALUES (?, ?, 'OPEN', ?, ?)").run(id, customerId, currency, createdAt);
+    else database.prepare("INSERT INTO sales (id, customer_id, status, currency) VALUES (?, ?, 'OPEN', ?)").run(id, customerId, currency);
+
+    for (const it of items) {
+      const qty = d(it.qty);
+      const price = d(it.price);
+      if (qty.lte(0) || price.lt(0)) throw new Error("BAD_ITEM");
+      const total = qty.mul(price);
+      const itemId = nanoid();
+      database.prepare("INSERT INTO sale_items (id, sale_id, product_id, qty, price, total) VALUES (?, ?, ?, ?, ?, ?)").run(
+        itemId,
+        id,
+        it.productId,
+        s(qty, 3),
+        s(price, 2),
+        s(total, 2),
+      );
+    }
+  });
+
+  try {
+    tx();
+  } catch {
+    return { ok: false as const };
+  }
+
+  logAudit({ userId: user.id, action: "CREATE", entity: "sale", entityId: id, payload: { customerId, currency, itemsCount: items.length } });
+  return { ok: true as const, id };
+}
+
 export async function addSaleItemAction(formData: FormData) {
   const user = await requireUser();
   const database = db();

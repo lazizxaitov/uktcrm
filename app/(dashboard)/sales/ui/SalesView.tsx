@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { addSaleItemAction, closeSaleAction, openSaleAction, refundSaleAction, removeSaleItemAction } from "@/app/(dashboard)/sales/actions";
+import { closeSaleAction, createSaleWithItemsAction, refundSaleAction, removeSaleItemAction } from "@/app/(dashboard)/sales/actions";
 import { useConfirmDialog } from "@/app/components/useConfirmDialog";
+import SaleItemsPickerModal, { type DraftSaleItem } from "@/app/(dashboard)/sales/ui/SaleItemsPickerModal";
+import DateField from "@/app/components/DateField";
 
 type CustomerOption = { id: string; name: string };
 type ProductOption = { id: string; name: string; sku: string };
@@ -62,14 +64,14 @@ export default function SalesView(props: {
 }) {
   const customers = useMemo(() => props.customers, [props.customers]);
   const products = useMemo(() => props.products, [props.products]);
-  const [openOpen, setOpenOpen] = useState(false);
-  const [openAdd, setOpenAdd] = useState(false);
+  const [openCreate, setOpenCreate] = useState(false);
   const [openClose, setOpenClose] = useState(false);
   const [refundId, setRefundId] = useState<string | null>(null);
-  const [dirtyOpen, setDirtyOpen] = useState(false);
-  const [dirtyAdd, setDirtyAdd] = useState(false);
   const [dirtyClose, setDirtyClose] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [draftItems, setDraftItems] = useState<DraftSaleItem[]>([]);
+  const [dirtyCreate, setDirtyCreate] = useState(false);
 
   const openSale = props.openSale;
   const openItems = props.openItems;
@@ -79,28 +81,15 @@ export default function SalesView(props: {
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     const open = sp.get("open") === "1";
-    const add = sp.get("add") === "1";
-    if (!open && !add) return;
+    if (!open) return;
     sp.delete("open");
-    sp.delete("add");
     const next = sp.toString();
     const url = `${window.location.pathname}${next ? `?${next}` : ""}`;
     window.history.replaceState(null, "", url);
 
-    if (open) {
-      setDirtyOpen(false);
-      setOpenOpen(true);
-      return;
-    }
-    if (add) {
-      if (openSale) {
-        setDirtyAdd(false);
-        setOpenAdd(true);
-      } else {
-        setDirtyOpen(false);
-        setOpenOpen(true);
-      }
-    }
+    setDraftItems([]);
+    setDirtyCreate(false);
+    setOpenCreate(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -110,28 +99,11 @@ export default function SalesView(props: {
         <div className="flex items-center justify-between px-4 py-3">
           <div className="text-sm font-semibold">Текущий чек</div>
           {!openSale ? (
-            <button
-              type="button"
-              onClick={() => {
-                setDirtyOpen(false);
-                setOpenOpen(true);
-              }}
-              className="rounded-xl px-3 py-2 text-sm btn-primary"
-            >
-              Открыть чек
+            <button type="button" onClick={() => { setDraftItems([]); setDirtyCreate(false); setOpenCreate(true); }} className="rounded-xl px-3 py-2 text-sm btn-primary">
+              Создать чек
             </button>
           ) : (
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setDirtyAdd(false);
-                  setOpenAdd(true);
-                }}
-                className="rounded-xl px-3 py-2 text-sm btn-primary"
-              >
-                Добавить позицию
-              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -285,14 +257,14 @@ export default function SalesView(props: {
       </div>
 
       <Modal
-        open={openOpen}
-        title="Открыть чек"
+        open={openCreate}
+        title="Новый чек"
         onClose={() => {
-          if (!dirtyOpen) {
-            setOpenOpen(false);
+          if (!dirtyCreate && draftItems.length === 0) {
+            setOpenCreate(false);
             return;
           }
-          confirm(() => setOpenOpen(false), {
+          confirm(() => setOpenCreate(false), {
             title: "Несохранённые данные",
             message: "Есть несохранённые изменения. Закрыть без сохранения?",
             confirmText: "Закрыть",
@@ -302,97 +274,111 @@ export default function SalesView(props: {
       >
         <form
           action={async (fd) => {
-            const res = await openSaleAction(fd);
-            if (!res?.ok) setError("Не удалось открыть чек.");
-            setOpenOpen(false);
+            setError(null);
+            if (draftItems.length === 0) {
+              setError("Добавьте хотя бы один товар.");
+              return;
+            }
+            const date = String(fd.get("date") ?? "").trim();
+            const time = String(fd.get("time") ?? "").trim();
+            if (date && time) {
+              const iso = new Date(`${date}T${time}:00`).toISOString();
+              fd.set("created_at", iso);
+            }
+            fd.set(
+              "items_json",
+              JSON.stringify(
+                draftItems.map((x) => ({
+                  productId: x.productId,
+                  qty: x.qty,
+                  price: x.price,
+                })),
+              ),
+            );
+            const res = await createSaleWithItemsAction(fd);
+            if (!res?.ok) {
+              setError("Проверьте товары (количество/цена) и поля чека.");
+              return;
+            }
+            setOpenCreate(false);
             window.location.reload();
           }}
-          onChange={() => setDirtyOpen(true)}
+          onChange={() => setDirtyCreate(true)}
           className="space-y-3"
         >
-          <div>
-            <label className="block text-xs font-medium text-zinc-600">Клиент (необязательно)</label>
-            <select
-              name="customer_id"
-              defaultValue=""
-              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
-            >
-              <option value="">—</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="block text-xs font-medium text-zinc-600">Клиент (необязательно)</label>
+              <select
+                name="customer_id"
+                defaultValue=""
+                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <option value="">—</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-600">Валюта</label>
+              <select
+                name="currency"
+                defaultValue="UZS"
+                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <option value="UZS">UZS</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-zinc-600">Валюта чека</label>
-            <select
-              name="currency"
-              defaultValue="UZS"
-              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
-            >
-              <option value="UZS">UZS</option>
-              <option value="USD">USD</option>
-            </select>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="block text-xs font-medium text-zinc-600">Дата</label>
+              <DateField name="date" defaultValue={new Date().toISOString().slice(0, 10)} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-600">Время</label>
+              <input
+                name="time"
+                type="time"
+                defaultValue={new Date().toTimeString().slice(0, 5)}
+                className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
+              />
+            </div>
           </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-3 text-sm dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="text-zinc-600 dark:text-zinc-300">
+              Товары: <span className="font-semibold text-zinc-900 dark:text-zinc-50">{draftItems.length}</span>
+            </div>
+            <button type="button" onClick={() => setPickerOpen(true)} className="rounded-xl px-4 py-2 text-sm btn-primary">
+              Добавить товары
+            </button>
+          </div>
+
+          {error ? <div className="text-sm text-red-600">{error}</div> : null}
+
           <button type="submit" className="w-full rounded-xl px-3 py-2 text-sm font-medium btn-primary">
-            Открыть
+            Создать чек
           </button>
         </form>
       </Modal>
 
-      <Modal
-        open={openAdd}
-        title="Добавить позицию"
-        onClose={() => {
-          if (!dirtyAdd) {
-            setOpenAdd(false);
-            return;
-          }
-          confirm(() => setOpenAdd(false), {
-            title: "Несохранённые данные",
-            message: "Есть несохранённые изменения. Закрыть без сохранения?",
-            confirmText: "Закрыть",
-            cancelText: "Не закрывать",
-          });
+      <SaleItemsPickerModal
+        open={pickerOpen}
+        products={products}
+        items={draftItems}
+        onClose={() => setPickerOpen(false)}
+        onDone={(items) => {
+          setDraftItems(items);
+          setDirtyCreate(true);
+          setPickerOpen(false);
         }}
-      >
-        <form
-          action={async (fd) => {
-            if (!openSale) return;
-            fd.set("sale_id", openSale.id);
-            const res = await addSaleItemAction(fd);
-            if (!res?.ok) setError("Проверьте поля (товар, кол-во, цена).");
-            setOpenAdd(false);
-            window.location.reload();
-          }}
-          onChange={() => setDirtyAdd(true)}
-          className="space-y-3"
-        >
-          <div>
-            <label className="block text-xs font-medium text-zinc-600">Товар</label>
-            <select
-              name="product_id"
-              defaultValue={products[0]?.id ?? ""}
-              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
-            >
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.sku})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Количество" name="qty" placeholder="Напр. 2" />
-            <Field label="Цена" name="price" placeholder="Напр. 15000" />
-          </div>
-          <button type="submit" className="w-full rounded-xl px-3 py-2 text-sm font-medium btn-primary">
-            Добавить
-          </button>
-        </form>
-      </Modal>
+      />
 
       <Modal
         open={openClose}
