@@ -33,6 +33,7 @@ export default async function ReportsPage(props: { searchParams?: Promise<Record
   const settings = getSettings();
 
   const sp = props.searchParams ? await props.searchParams : {};
+  const q = typeof sp.q === "string" ? sp.q : "";
   const now = new Date();
   const defaultFrom = new Date(now.getTime() - 1000 * 60 * 60 * 24 * 30);
   const from = parseDate(typeof sp.from === "string" ? sp.from : undefined, defaultFrom);
@@ -175,10 +176,38 @@ export default async function ReportsPage(props: { searchParams?: Promise<Record
     return new Map(out.map((o) => [o.product_id, o]));
   })();
 
+  const topRows = (() => {
+    const query = q.trim().toLowerCase();
+    if (!query) return abc.slice(0, 50);
+    return abc
+      .filter((p) => {
+        const name = (p.name ?? "").toLowerCase();
+        const sku = (p.sku ?? "").toLowerCase();
+        return name.includes(query) || sku.includes(query);
+      })
+      .slice(0, 200);
+  })();
+
   return (
     <div>
-      <h1 className="text-xl font-semibold">Отчёты</h1>
-      <div className="mt-1 text-sm text-zinc-500">Выручка, прибыль, ABC/XYZ анализ.</div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Отчёты</h1>
+          <div className="mt-1 text-sm text-zinc-500">Выручка, прибыль, ABC/XYZ анализ.</div>
+        </div>
+
+        <form className="w-full sm:w-[360px]" action="/reports">
+          <input type="hidden" name="from" value={fromYmd} />
+          <input type="hidden" name="to" value={toYmd} />
+          <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-300">Поиск</label>
+          <input
+            name="q"
+            defaultValue={q}
+            placeholder="Товар или SKU"
+            className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--brand)] dark:border-zinc-800 dark:bg-zinc-950"
+          />
+        </form>
+      </div>
 
       <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
         <form className="flex flex-wrap items-end gap-3" action="/reports">
@@ -190,6 +219,7 @@ export default async function ReportsPage(props: { searchParams?: Promise<Record
             <label className="block text-xs font-medium text-zinc-600">По</label>
             <DateField name="to" defaultValue={toYmd} />
           </div>
+          <input type="hidden" name="q" value={q} />
           <button type="submit" className="rounded-xl px-4 py-2 text-sm font-medium btn-primary">
             Показать
           </button>
@@ -254,14 +284,14 @@ export default async function ReportsPage(props: { searchParams?: Promise<Record
                 </tr>
               </thead>
               <tbody>
-                {abc.length === 0 ? (
+                {topRows.length === 0 ? (
                   <tr>
                     <td className="px-4 py-8 text-center text-zinc-500" colSpan={5}>
-                      Нет продаж
+                      {q.trim() ? "Ничего не найдено" : "Нет продаж"}
                     </td>
                   </tr>
                 ) : (
-                  abc.slice(0, 50).map((p) => {
+                  topRows.map((p) => {
                     const rev = new Decimal(p.revenue_uzs);
                     const cost = new Decimal(p.cost_uzs);
                     const profit = rev.sub(cost);
