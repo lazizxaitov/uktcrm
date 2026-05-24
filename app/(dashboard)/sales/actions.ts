@@ -295,6 +295,23 @@ export async function refundSaleAction(formData: FormData) {
   return { ok: true as const };
 }
 
+export async function deleteOpenSaleAction(formData: FormData) {
+  const user = await requireUser();
+  const database = db();
+  const saleId = str(formData, "sale_id");
+  if (!saleId) return { ok: false as const };
+
+  const sale = database.prepare("SELECT id, status FROM sales WHERE id=?").get(saleId) as { id: string; status: string } | undefined;
+  if (!sale || sale.status !== "OPEN") return { ok: false as const };
+
+  const items = database.prepare("SELECT COUNT(1) as cnt FROM sale_items WHERE sale_id=?").get(saleId) as { cnt: number };
+  if (items.cnt > 0) return { ok: false as const };
+
+  database.prepare("DELETE FROM sales WHERE id=?").run(saleId);
+  logAudit({ userId: user.id, action: "DELETE", entity: "sale", entityId: saleId, payload: { reason: "empty_open_sale" } });
+  return { ok: true as const };
+}
+
 function DecimalMin(a: import("decimal.js").Decimal, b: import("decimal.js").Decimal) {
   return a.lte(b) ? a : b;
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { closeSaleAction, createSaleWithItemsAction, refundSaleAction, removeSaleItemAction } from "@/app/(dashboard)/sales/actions";
+import { closeSaleAction, createSaleWithItemsAction, deleteOpenSaleAction, refundSaleAction, removeSaleItemAction } from "@/app/(dashboard)/sales/actions";
 import { useConfirmDialog } from "@/app/components/useConfirmDialog";
 import SaleItemsPickerModal, { type DraftSaleItem } from "@/app/(dashboard)/sales/ui/SaleItemsPickerModal";
 import DateField from "@/app/components/DateField";
@@ -104,6 +104,33 @@ export default function SalesView(props: {
             </button>
           ) : (
             <div className="flex items-center gap-2">
+              {openItems.length === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!openSale) return;
+                    confirm(
+                      () => {
+                        const fd = new FormData();
+                        fd.set("sale_id", openSale.id);
+                        deleteOpenSaleAction(fd).then((res) => {
+                          if (!res?.ok) setError("Не удалось удалить чек.");
+                          window.location.reload();
+                        });
+                      },
+                      {
+                        title: "Удалить чек",
+                        message: "Чек пустой. Удалить его?",
+                        confirmText: "Удалить",
+                        cancelText: "Отмена",
+                      },
+                    );
+                  }}
+                  className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-900/40 dark:bg-zinc-950 dark:text-red-300 dark:hover:bg-red-950/30"
+                >
+                  Удалить чек
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => {
