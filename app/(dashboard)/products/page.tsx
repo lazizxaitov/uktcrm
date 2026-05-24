@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/db";
 import { migrate } from "@/lib/db/migrate";
-import ProductsTable from "@/app/(dashboard)/products/ui/ProductsTable";
+import ProductsView from "@/app/(dashboard)/products/ui/ProductsView";
 
 export const metadata = { title: "Товары • UKT CRM" };
 
@@ -31,12 +31,6 @@ export default function ProductsPage() {
     reorder_point: string;
   }>;
   return (
-    <div>
-      <h1 className="text-xl font-semibold">Товары</h1>
-      <div className="mt-1 text-sm text-zinc-500">SKU, категории, точки заказа и safety stock.</div>
-      <div className="mt-6">
-        <ProductsTable rows={rows} categories={categories} />
-      </div>
-    </div>
+    <ProductsView rows={rows} categories={categories} />
   );
 }

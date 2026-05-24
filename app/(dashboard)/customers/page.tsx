@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/db";
 import { migrate } from "@/lib/db/migrate";
-import CustomersTable from "@/app/(dashboard)/customers/ui/CustomersTable";
+import CustomersView from "@/app/(dashboard)/customers/ui/CustomersView";
 
 export const metadata = { title: "Клиенты • UKT CRM" };
 
@@ -19,12 +19,6 @@ export default function CustomersPage() {
   }>;
 
   return (
-    <div>
-      <h1 className="text-xl font-semibold">Клиенты</h1>
-      <div className="mt-1 text-sm text-zinc-500">Карта клиента, лимит и срок долга.</div>
-      <div className="mt-6">
-        <CustomersTable rows={rows} />
-      </div>
-    </div>
+    <CustomersView rows={rows} />
   );
 }
