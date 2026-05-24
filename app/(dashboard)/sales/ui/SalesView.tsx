@@ -76,6 +76,35 @@ export default function SalesView(props: {
 
   const openSale = props.openSale;
   const openItems = props.openItems;
+  const [salesSort, setSalesSort] = useState<{ key: "status" | "customer" | "total" | "paid" | "when"; dir: "asc" | "desc" }>({
+    key: "when",
+    dir: "desc",
+  });
+
+  const sortedLastSales = useMemo(() => {
+    const rows = [...props.lastSales];
+    const dir = salesSort.dir === "asc" ? 1 : -1;
+    const byText = (a: string | null, b: string | null) => (String(a ?? "").localeCompare(String(b ?? ""), "ru") * dir);
+    const byNum = (a: string, b: string) => ((Number(a) || 0) - (Number(b) || 0)) * dir;
+    const byDate = (a: string, b: string) => (new Date(a).getTime() - new Date(b).getTime()) * dir;
+
+    rows.sort((a, b) => {
+      switch (salesSort.key) {
+        case "status":
+          return byText(a.status, b.status) || byDate(a.created_at, b.created_at);
+        case "customer":
+          return byText(a.customer_name, b.customer_name) || byDate(a.created_at, b.created_at);
+        case "total":
+          return byNum(a.total, b.total) || byDate(a.created_at, b.created_at);
+        case "paid":
+          return byNum(a.paid, b.paid) || byDate(a.created_at, b.created_at);
+        case "when":
+        default:
+          return byDate(a.created_at, b.created_at);
+      }
+    });
+    return rows;
+  }, [props.lastSales, salesSort]);
 
   const { confirm, dialog } = useConfirmDialog();
 
@@ -225,11 +254,66 @@ export default function SalesView(props: {
           <table className="w-full text-sm">
             <thead className="text-xs text-zinc-500">
               <tr>
-                <th className="px-4 py-3 text-left font-medium">Статус</th>
-                <th className="px-4 py-3 text-left font-medium">Клиент</th>
-                <th className="px-4 py-3 text-left font-medium">Сумма</th>
-                <th className="px-4 py-3 text-left font-medium">Оплачено</th>
-                <th className="px-4 py-3 text-left font-medium">Когда</th>
+                <th className="px-4 py-3 text-left font-medium">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSalesSort((s) => ({ key: "status", dir: s.key === "status" && s.dir === "desc" ? "asc" : "desc" }))
+                    }
+                    className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200"
+                    title="Сортировать"
+                  >
+                    Статус {salesSort.key === "status" ? (salesSort.dir === "asc" ? "↑" : "↓") : null}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-medium">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSalesSort((s) => ({ key: "customer", dir: s.key === "customer" && s.dir === "desc" ? "asc" : "desc" }))
+                    }
+                    className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200"
+                    title="Сортировать"
+                  >
+                    Клиент {salesSort.key === "customer" ? (salesSort.dir === "asc" ? "↑" : "↓") : null}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-medium">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSalesSort((s) => ({ key: "total", dir: s.key === "total" && s.dir === "desc" ? "asc" : "desc" }))
+                    }
+                    className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200"
+                    title="Сортировать"
+                  >
+                    Сумма {salesSort.key === "total" ? (salesSort.dir === "asc" ? "↑" : "↓") : null}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-medium">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSalesSort((s) => ({ key: "paid", dir: s.key === "paid" && s.dir === "desc" ? "asc" : "desc" }))
+                    }
+                    className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200"
+                    title="Сортировать"
+                  >
+                    Оплачено {salesSort.key === "paid" ? (salesSort.dir === "asc" ? "↑" : "↓") : null}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left font-medium">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSalesSort((s) => ({ key: "when", dir: s.key === "when" && s.dir === "desc" ? "asc" : "desc" }))
+                    }
+                    className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200"
+                    title="Сортировать"
+                  >
+                    Когда {salesSort.key === "when" ? (salesSort.dir === "asc" ? "↑" : "↓") : null}
+                  </button>
+                </th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -241,7 +325,7 @@ export default function SalesView(props: {
                   </td>
                 </tr>
               ) : (
-                props.lastSales.map((s) => (
+                sortedLastSales.map((s) => (
                   <tr key={s.id} className="border-t border-zinc-100 dark:border-zinc-900">
                     <td className="px-4 py-3">
                       <span className="rounded-full px-2 py-1 text-xs badge-brand">{s.status}</span>
