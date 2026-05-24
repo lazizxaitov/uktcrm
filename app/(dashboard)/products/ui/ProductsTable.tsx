@@ -73,6 +73,10 @@ export default function ProductsTable(props: { rows: ProductRow[]; categories: A
   const [editCategoryId, setEditCategoryId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ProductRow | null>(null);
   const [dirtyProduct, setDirtyProduct] = useState(false);
+  const [sort, setSort] = useState<{ key: "name" | "sku" | "category" | "safety" | "reorder"; dir: "asc" | "desc" }>({
+    key: "name",
+    dir: "asc",
+  });
   const [error, setError] = useState<string | null>(null);
   const rows = useMemo(() => props.rows, [props.rows]);
 
@@ -86,6 +90,30 @@ export default function ProductsTable(props: { rows: ProductRow[]; categories: A
     if (!categoryFilterId) return rows;
     return rows.filter((r) => r.category_id === categoryFilterId);
   }, [rows, categoryFilterId]);
+
+  const sortedRows = useMemo(() => {
+    const arr = [...filteredRows];
+    const dir = sort.dir === "asc" ? 1 : -1;
+    const byText = (a: string | null, b: string | null) => String(a ?? "").localeCompare(String(b ?? ""), "ru") * dir;
+    const byNum = (a: string, b: string) => ((Number(a) || 0) - (Number(b) || 0)) * dir;
+
+    arr.sort((a, b) => {
+      switch (sort.key) {
+        case "sku":
+          return byText(a.sku, b.sku) || byText(a.name, b.name);
+        case "category":
+          return byText(a.category_name, b.category_name) || byText(a.name, b.name);
+        case "safety":
+          return byNum(a.safety_stock, b.safety_stock) || byText(a.name, b.name);
+        case "reorder":
+          return byNum(a.reorder_point, b.reorder_point) || byText(a.name, b.name);
+        case "name":
+        default:
+          return byText(a.name, b.name) || byText(a.sku, b.sku);
+      }
+    });
+    return arr;
+  }, [filteredRows, sort]);
 
   const startCreate = () => {
     setError(null);
@@ -150,23 +178,68 @@ export default function ProductsTable(props: { rows: ProductRow[]; categories: A
         <table className="w-full text-sm">
           <thead className="text-xs text-zinc-500">
             <tr>
-              <th className="px-4 py-3 text-left font-medium">Товар</th>
-              <th className="px-4 py-3 text-left font-medium">SKU</th>
-              <th className="px-4 py-3 text-left font-medium">Категория</th>
-              <th className="px-4 py-3 text-left font-medium">Safety</th>
-              <th className="px-4 py-3 text-left font-medium">Reorder</th>
+              <th className="px-4 py-3 text-left font-medium">
+                <button
+                  type="button"
+                  onClick={() => setSort((s) => ({ key: "name", dir: s.key === "name" && s.dir === "desc" ? "asc" : "desc" }))}
+                  className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200"
+                  title="Сортировать"
+                >
+                  Товар {sort.key === "name" ? (sort.dir === "asc" ? "↑" : "↓") : null}
+                </button>
+              </th>
+              <th className="px-4 py-3 text-left font-medium">
+                <button
+                  type="button"
+                  onClick={() => setSort((s) => ({ key: "sku", dir: s.key === "sku" && s.dir === "desc" ? "asc" : "desc" }))}
+                  className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200"
+                  title="Сортировать"
+                >
+                  SKU {sort.key === "sku" ? (sort.dir === "asc" ? "↑" : "↓") : null}
+                </button>
+              </th>
+              <th className="px-4 py-3 text-left font-medium">
+                <button
+                  type="button"
+                  onClick={() => setSort((s) => ({ key: "category", dir: s.key === "category" && s.dir === "desc" ? "asc" : "desc" }))}
+                  className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200"
+                  title="Сортировать"
+                >
+                  Категория {sort.key === "category" ? (sort.dir === "asc" ? "↑" : "↓") : null}
+                </button>
+              </th>
+              <th className="px-4 py-3 text-left font-medium">
+                <button
+                  type="button"
+                  onClick={() => setSort((s) => ({ key: "safety", dir: s.key === "safety" && s.dir === "desc" ? "asc" : "desc" }))}
+                  className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200"
+                  title="Сортировать"
+                >
+                  Минимум {sort.key === "safety" ? (sort.dir === "asc" ? "↑" : "↓") : null}
+                </button>
+              </th>
+              <th className="px-4 py-3 text-left font-medium">
+                <button
+                  type="button"
+                  onClick={() => setSort((s) => ({ key: "reorder", dir: s.key === "reorder" && s.dir === "desc" ? "asc" : "desc" }))}
+                  className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200"
+                  title="Сортировать"
+                >
+                  Точка заказа {sort.key === "reorder" ? (sort.dir === "asc" ? "↑" : "↓") : null}
+                </button>
+              </th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
-            {filteredRows.length === 0 ? (
+            {sortedRows.length === 0 ? (
               <tr>
                 <td className="px-4 py-8 text-center text-zinc-500" colSpan={6}>
                   {rows.length === 0 ? "Нет товаров" : "Нет товаров в этой категории"}
                 </td>
               </tr>
             ) : (
-              filteredRows.map((r) => (
+              sortedRows.map((r) => (
                 <tr key={r.id} className="border-t border-zinc-100 dark:border-zinc-900">
                   <td className="px-4 py-3">{r.name}</td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">{r.sku}</td>

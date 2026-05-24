@@ -59,10 +59,37 @@ export default function CustomersTable(props: { rows: CustomerRow[] }) {
   const [editing, setEditing] = useState<CustomerRow | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<CustomerRow | null>(null);
   const [dirtyCustomer, setDirtyCustomer] = useState(false);
+  const [sort, setSort] = useState<{ key: "name" | "phone" | "limit" | "days"; dir: "asc" | "desc" }>({
+    key: "name",
+    dir: "asc",
+  });
   const [error, setError] = useState<string | null>(null);
   const rows = useMemo(() => props.rows, [props.rows]);
 
   const { confirm, dialog } = useConfirmDialog();
+
+  const sortedRows = useMemo(() => {
+    const arr = [...rows];
+    const dir = sort.dir === "asc" ? 1 : -1;
+    const byText = (a: string | null, b: string | null) => String(a ?? "").localeCompare(String(b ?? ""), "ru") * dir;
+    const byNum = (a: string, b: string) => ((Number(a) || 0) - (Number(b) || 0)) * dir;
+    const byInt = (a: number | null, b: number | null) => ((Number(a ?? 0) || 0) - (Number(b ?? 0) || 0)) * dir;
+
+    arr.sort((a, b) => {
+      switch (sort.key) {
+        case "phone":
+          return byText(a.phone, b.phone) || byText(a.name, b.name);
+        case "limit":
+          return byNum(a.debt_limit, b.debt_limit) || byText(a.name, b.name);
+        case "days":
+          return byInt(a.debt_days, b.debt_days) || byText(a.name, b.name);
+        case "name":
+        default:
+          return byText(a.name, b.name);
+      }
+    });
+    return arr;
+  }, [rows, sort]);
 
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
@@ -99,10 +126,46 @@ export default function CustomersTable(props: { rows: CustomerRow[] }) {
         <table className="w-full text-sm">
           <thead className="text-xs text-zinc-500">
             <tr>
-              <th className="px-4 py-3 text-left font-medium">Клиент</th>
-              <th className="px-4 py-3 text-left font-medium">Телефон</th>
-              <th className="px-4 py-3 text-left font-medium">Лимит долга</th>
-              <th className="px-4 py-3 text-left font-medium">Срок (дни)</th>
+              <th className="px-4 py-3 text-left font-medium">
+                <button
+                  type="button"
+                  onClick={() => setSort((s) => ({ key: "name", dir: s.key === "name" && s.dir === "desc" ? "asc" : "desc" }))}
+                  className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200"
+                  title="Сортировать"
+                >
+                  Клиент {sort.key === "name" ? (sort.dir === "asc" ? "↑" : "↓") : null}
+                </button>
+              </th>
+              <th className="px-4 py-3 text-left font-medium">
+                <button
+                  type="button"
+                  onClick={() => setSort((s) => ({ key: "phone", dir: s.key === "phone" && s.dir === "desc" ? "asc" : "desc" }))}
+                  className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200"
+                  title="Сортировать"
+                >
+                  Телефон {sort.key === "phone" ? (sort.dir === "asc" ? "↑" : "↓") : null}
+                </button>
+              </th>
+              <th className="px-4 py-3 text-left font-medium">
+                <button
+                  type="button"
+                  onClick={() => setSort((s) => ({ key: "limit", dir: s.key === "limit" && s.dir === "desc" ? "asc" : "desc" }))}
+                  className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200"
+                  title="Сортировать"
+                >
+                  Лимит долга {sort.key === "limit" ? (sort.dir === "asc" ? "↑" : "↓") : null}
+                </button>
+              </th>
+              <th className="px-4 py-3 text-left font-medium">
+                <button
+                  type="button"
+                  onClick={() => setSort((s) => ({ key: "days", dir: s.key === "days" && s.dir === "desc" ? "asc" : "desc" }))}
+                  className="inline-flex items-center gap-1 hover:text-zinc-700 dark:hover:text-zinc-200"
+                  title="Сортировать"
+                >
+                  Срок (дни) {sort.key === "days" ? (sort.dir === "asc" ? "↑" : "↓") : null}
+                </button>
+              </th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -114,7 +177,7 @@ export default function CustomersTable(props: { rows: CustomerRow[] }) {
                 </td>
               </tr>
             ) : (
-              rows.map((r) => (
+              sortedRows.map((r) => (
                 <tr key={r.id} className="border-t border-zinc-100 dark:border-zinc-900">
                   <td className="px-4 py-3">{r.name}</td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">{r.phone ?? "—"}</td>
