@@ -9,19 +9,35 @@ function str(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
+function genSkuRaw() {
+  return `SKU-${nanoid(8).replace(/[-_]/g, "").toUpperCase()}`;
+}
+
+function generateUniqueSku(database: ReturnType<typeof db>) {
+  for (let i = 0; i < 12; i++) {
+    const sku = genSkuRaw();
+    const exists = database.prepare("SELECT 1 FROM products WHERE sku=?").get(sku);
+    if (!exists) return sku;
+  }
+  return null;
+}
+
 export async function upsertProductAction(formData: FormData) {
   const user = await requireUser();
   const database = db();
   const id = str(formData, "id");
   const name = str(formData, "name");
-  const sku = str(formData, "sku");
+  const skuInput = str(formData, "sku");
   const barcode = str(formData, "barcode") || null;
   const categoryId = str(formData, "category_id") || null;
   const boxSize = str(formData, "box_size");
   const safetyStock = str(formData, "safety_stock") || "0";
   const reorderPoint = str(formData, "reorder_point") || "0";
 
-  if (!name || !sku) return { ok: false as const };
+  if (!name) return { ok: false as const };
+
+  const sku = skuInput || generateUniqueSku(database);
+  if (!sku) return { ok: false as const };
 
   const boxSizeVal = boxSize ? Number(boxSize) : null;
   if (boxSize && (!Number.isFinite(boxSizeVal) || boxSizeVal! <= 0)) return { ok: false as const };
